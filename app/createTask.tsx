@@ -2,8 +2,10 @@ import { useRouter } from "expo-router";
 import React, { useState } from "react";
 import {
   Alert,
+  FlatList,
   Image,
   KeyboardAvoidingView,
+  Modal,
   Platform,
   ScrollView,
   StyleSheet,
@@ -12,7 +14,6 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-import DropDownPicker from "react-native-dropdown-picker";
 
 const pekerjaanDummy = [
   {
@@ -37,14 +38,117 @@ const proyekDummy = [
   { label: "Proyek C", value: "proyekC" },
 ];
 
+// Custom Dropdown Component
+const CustomDropdown = ({
+  items,
+  value,
+  onSelect,
+  placeholder,
+  style = {},
+  searchable = false,
+}) => {
+  const [isVisible, setIsVisible] = useState(false);
+  const [searchText, setSearchText] = useState("");
+
+  const filteredItems = searchable
+    ? items.filter((item) =>
+        item.label.toLowerCase().includes(searchText.toLowerCase())
+      )
+    : items;
+
+  const selectedItem = items.find((item) => item.value === value);
+
+  const handleSelect = (item) => {
+    onSelect(item.value);
+    setIsVisible(false);
+    setSearchText("");
+  };
+
+  return (
+    <>
+      <TouchableOpacity
+        style={[styles.customDropdown, style]}
+        onPress={() => setIsVisible(true)}
+      >
+        <Text style={styles.customDropdownText} numberOfLines={2}>
+          {selectedItem ? selectedItem.label : placeholder}
+        </Text>
+        <Text style={styles.customDropdownArrow}>▼</Text>
+      </TouchableOpacity>
+
+      <Modal
+        visible={isVisible}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setIsVisible(false)}
+      >
+        <TouchableOpacity
+          style={styles.modalOverlay}
+          onPress={() => setIsVisible(false)}
+        >
+          <View
+            style={styles.modalContent}
+            onStartShouldSetResponder={() => true}
+          >
+            <Text style={styles.modalTitle}>{placeholder}</Text>
+
+            {searchable && (
+              <TextInput
+                style={styles.searchInput}
+                placeholder="Cari..."
+                value={searchText}
+                onChangeText={setSearchText}
+                autoFocus={true}
+              />
+            )}
+
+            <FlatList
+              data={filteredItems}
+              keyExtractor={(item) => item.value}
+              showsVerticalScrollIndicator={false}
+              style={styles.optionsList}
+              renderItem={({ item }) => (
+                <TouchableOpacity
+                  style={[
+                    styles.optionItem,
+                    item.value === value && styles.selectedOption,
+                  ]}
+                  onPress={() => handleSelect(item)}
+                >
+                  <Text
+                    style={[
+                      styles.optionText,
+                      item.value === value && styles.selectedOptionText,
+                    ]}
+                    numberOfLines={0}
+                  >
+                    {item.label}
+                  </Text>
+                  {item.value === value && (
+                    <Text style={styles.checkMark}>✓</Text>
+                  )}
+                </TouchableOpacity>
+              )}
+            />
+
+            <TouchableOpacity
+              style={styles.closeButton}
+              onPress={() => setIsVisible(false)}
+            >
+              <Text style={styles.closeButtonText}>Tutup</Text>
+            </TouchableOpacity>
+          </View>
+        </TouchableOpacity>
+      </Modal>
+    </>
+  );
+};
+
 export default function CreateTaskScreen() {
   const router = useRouter();
   // Dropdown states
-  const [openPekerjaan, setOpenPekerjaan] = useState(false);
   const [pekerjaan, setPekerjaan] = useState(pekerjaanDummy[0].value);
-  const [openKegiatan, setOpenKegiatan] = useState(false);
   const [kegiatan, setKegiatan] = useState(kegiatanDummy[0].value);
-  const [openProyek, setOpenProyek] = useState(false);
   const [proyek, setProyek] = useState(proyekDummy[0].value);
   const [progress, setProgress] = useState("1.015");
   const [catatan, setCatatan] = useState(
@@ -86,88 +190,36 @@ export default function CreateTaskScreen() {
         >
           <View style={styles.card}>
             {/* Proyek Dropdown */}
-            <View style={[styles.formGroup, { zIndex: openProyek ? 3000 : 1 }]}>
+            <View style={[styles.formGroup, { zIndex: 1 }]}>
               <Text style={styles.label}>Pilih Proyek *</Text>
-              <DropDownPicker
-                open={openProyek}
-                value={proyek}
+              <CustomDropdown
                 items={proyekDummy}
-                setOpen={setOpenProyek}
-                setValue={setProyek}
-                setItems={() => {}}
-                style={styles.dropdown}
-                dropDownContainerStyle={styles.dropdownContainer}
-                zIndex={3000}
-                zIndexInverse={1000}
-                listItemLabelStyle={styles.dropdownLabel}
-                listItemContainerStyle={styles.dropdownItemContainer}
-                labelProps={{
-                  numberOfLines: 0,
-                  adjustsFontSizeToFit: false,
-                  style: { flexWrap: "wrap", textAlign: "left", width: "100%" },
-                }}
-                autoScroll
-                itemSeparator={true}
-                itemSeparatorStyle={styles.dropdownSeparator}
-                maxHeight={300}
+                value={proyek}
+                onSelect={setProyek}
+                placeholder="Pilih Proyek"
+                searchable={true}
               />
             </View>
             {/* Pekerjaan Dropdown */}
-            <View
-              style={[styles.formGroup, { zIndex: openPekerjaan ? 2000 : 1 }]}
-            >
+            <View style={[styles.formGroup, { zIndex: 1 }]}>
               <Text style={styles.label}>Pilih Pekerjaan *</Text>
-              <DropDownPicker
-                open={openPekerjaan}
-                value={pekerjaan}
+              <CustomDropdown
                 items={pekerjaanDummy}
-                setOpen={setOpenPekerjaan}
-                setValue={setPekerjaan}
-                setItems={() => {}}
-                style={styles.dropdown}
-                dropDownContainerStyle={styles.dropdownContainer}
-                zIndex={2000}
-                zIndexInverse={2000}
-                listItemLabelStyle={styles.dropdownLabel}
-                listItemContainerStyle={styles.dropdownItemContainer}
-                labelProps={{
-                  numberOfLines: 0,
-                  adjustsFontSizeToFit: false,
-                  style: { flexWrap: "wrap", textAlign: "left", width: "100%" },
-                }}
-                autoScroll
-                itemSeparator={true}
-                itemSeparatorStyle={styles.dropdownSeparator}
-                maxHeight={300}
+                value={pekerjaan}
+                onSelect={setPekerjaan}
+                placeholder="Pilih Pekerjaan"
+                searchable={true}
               />
             </View>
             {/* Kegiatan Dropdown */}
-            <View
-              style={[styles.formGroup, { zIndex: openKegiatan ? 1000 : 1 }]}
-            >
+            <View style={[styles.formGroup, { zIndex: 1 }]}>
               <Text style={styles.label}>Pilih Kegiatan *</Text>
-              <DropDownPicker
-                open={openKegiatan}
-                value={kegiatan}
+              <CustomDropdown
                 items={kegiatanDummy}
-                setOpen={setOpenKegiatan}
-                setValue={setKegiatan}
-                setItems={() => {}}
-                style={styles.dropdown}
-                dropDownContainerStyle={styles.dropdownContainer}
-                zIndex={1000}
-                zIndexInverse={3000}
-                listItemLabelStyle={styles.dropdownLabel}
-                listItemContainerStyle={styles.dropdownItemContainer}
-                labelProps={{
-                  numberOfLines: 0,
-                  adjustsFontSizeToFit: false,
-                  style: { flexWrap: "wrap", textAlign: "left", width: "100%" },
-                }}
-                autoScroll
-                itemSeparator={true}
-                itemSeparatorStyle={styles.dropdownSeparator}
-                maxHeight={300}
+                value={kegiatan}
+                onSelect={setKegiatan}
+                placeholder="Pilih Kegiatan"
+                searchable={true}
               />
             </View>
             {/* Progress */}
@@ -316,44 +368,100 @@ const styles = StyleSheet.create({
     marginBottom: 4,
     fontWeight: "600",
   },
-  dropdown: {
+  // Custom Dropdown Styles
+  customDropdown: {
     backgroundColor: "#f9fafb",
     borderColor: "#e5e7eb",
+    borderWidth: 1,
     borderRadius: 8,
-    minHeight: 44,
-    marginBottom: 2,
+    paddingHorizontal: 12,
+    paddingVertical: 12,
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    minHeight: 50,
   },
-  dropdownContainer: {
-    borderColor: "#e5e7eb",
-    borderRadius: 8,
+  customDropdownText: {
+    fontSize: 14,
+    color: "#101828",
+    flex: 1,
+    paddingRight: 8,
+  },
+  customDropdownArrow: {
+    fontSize: 12,
+    color: "#6b7280",
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0, 0, 0, 0.5)",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  modalContent: {
     backgroundColor: "#fff",
-    zIndex: 1000,
+    borderRadius: 12,
+    padding: 20,
+    width: "90%",
+    maxHeight: "80%",
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: "bold",
+    color: "#101828",
+    marginBottom: 15,
+    textAlign: "center",
+  },
+  searchInput: {
+    backgroundColor: "#f9fafb",
+    borderColor: "#e5e7eb",
+    borderWidth: 1,
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    fontSize: 14,
+    marginBottom: 15,
+  },
+  optionsList: {
     maxHeight: 300,
   },
-  dropdownLabel: {
-    fontSize: 14,
-    lineHeight: 20,
-    color: "#101828",
-    paddingRight: 8,
-    width: "100%",
-    textAlign: "left",
-    alignSelf: "stretch",
-  },
-  dropdownItemContainer: {
-    minHeight: 100,
-    height: "auto",
-    alignItems: "flex-start",
-    paddingVertical: 15,
-    paddingHorizontal: 12,
-    backgroundColor: "#fff",
+  optionItem: {
+    paddingVertical: 12,
+    paddingHorizontal: 15,
     borderBottomWidth: 0.5,
     borderBottomColor: "#e5e7eb",
-    justifyContent: "center",
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
   },
-  dropdownSeparator: {
-    height: 1,
-    backgroundColor: "#e5e7eb",
-    marginHorizontal: 12,
+  selectedOption: {
+    backgroundColor: "#f0f9ff",
+  },
+  optionText: {
+    fontSize: 14,
+    color: "#101828",
+    flex: 1,
+    lineHeight: 20,
+  },
+  selectedOptionText: {
+    color: "#1d4ed8",
+    fontWeight: "500",
+  },
+  checkMark: {
+    color: "#1d4ed8",
+    fontSize: 16,
+    fontWeight: "bold",
+  },
+  closeButton: {
+    backgroundColor: "#1a365d",
+    borderRadius: 8,
+    paddingVertical: 12,
+    alignItems: "center",
+    marginTop: 15,
+  },
+  closeButtonText: {
+    color: "#fff",
+    fontSize: 16,
+    fontWeight: "500",
   },
   input: {
     backgroundColor: "#f9fafb",
