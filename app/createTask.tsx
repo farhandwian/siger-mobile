@@ -1,6 +1,7 @@
 import { useRouter } from "expo-router";
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
+  ActivityIndicator,
   Alert,
   FlatList,
   Image,
@@ -15,29 +16,6 @@ import {
   View,
 } from "react-native";
 
-const pekerjaanDummy = [
-  {
-    label:
-      "REHABILITASI/ PENINGKATAN BANGUNAN, PINTU AIR DAN JARINGAN IRIGASI DI/DIR di KABUPATEN LAMPUNG TENGAH DAN KABUPATEN LAMPUNG TIMUR",
-    value: "rehab",
-  },
-  { label: "PEMBANGUNAN JEMBATAN BARU", value: "jembatan" },
-  { label: "PERBAIKAN SALURAN IRIGASI", value: "irigasi" },
-];
-const kegiatanDummy = [
-  {
-    label: "Galian Tanah di Rawa menggunakan Excavator Standar",
-    value: "galian",
-  },
-  { label: "Pemasangan Pintu Air", value: "pintuair" },
-  { label: "Pengecoran Saluran", value: "pengecoran" },
-];
-const proyekDummy = [
-  { label: "Proyek A", value: "proyekA" },
-  { label: "Proyek B", value: "proyekB" },
-  { label: "Proyek C", value: "proyekC" },
-];
-
 // Custom Dropdown Component
 const CustomDropdown = ({
   items,
@@ -46,46 +24,121 @@ const CustomDropdown = ({
   placeholder,
   style = {},
   searchable = false,
+  disabled = false,
+}: {
+  items: any[];
+  value: any;
+  onSelect: (value: any) => void;
+  placeholder: string;
+  style?: any;
+  searchable?: boolean;
+  disabled?: boolean;
 }) => {
   const [isVisible, setIsVisible] = useState(false);
   const [searchText, setSearchText] = useState("");
 
   const filteredItems = searchable
-    ? items.filter((item) =>
-        item.label.toLowerCase().includes(searchText.toLowerCase())
-      )
+    ? items.filter((item: any) => {
+        const searchLower = searchText.toLowerCase().trim();
+        const labelLower = item.label.toLowerCase();
+        // Search dalam label dengan multiple kata
+        return (
+          searchLower === "" ||
+          labelLower.includes(searchLower) ||
+          labelLower
+            .split(" ")
+            .some((word: string) => word.startsWith(searchLower))
+        );
+      })
     : items;
 
-  const selectedItem = items.find((item) => item.value === value);
+  const selectedItem = items.find((item: any) => item.value === value);
 
-  const handleSelect = (item) => {
+  const handleSelect = (item: any) => {
     onSelect(item.value);
     setIsVisible(false);
-    setSearchText("");
+    setSearchText(""); // Reset search when closing
+  };
+
+  const handleClose = () => {
+    setIsVisible(false);
+    setSearchText(""); // Reset search when closing
+  };
+
+  // Function to highlight searched text
+  const renderHighlightedText = (text: string, searchTerm: string) => {
+    if (!searchable || !searchTerm.trim()) {
+      return (
+        <Text
+          style={[
+            styles.optionText,
+            value === value && styles.selectedOptionText,
+          ]}
+          numberOfLines={0}
+        >
+          {text}
+        </Text>
+      );
+    }
+
+    const regex = new RegExp(
+      `(${searchTerm.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")})`,
+      "gi"
+    );
+    const parts = text.split(regex);
+
+    return (
+      <Text
+        style={[
+          styles.optionText,
+          value === value && styles.selectedOptionText,
+        ]}
+        numberOfLines={0}
+      >
+        {parts.map((part, index) =>
+          regex.test(part) ? (
+            <Text key={index} style={styles.highlightedText}>
+              {part}
+            </Text>
+          ) : (
+            part
+          )
+        )}
+      </Text>
+    );
   };
 
   return (
     <>
       <TouchableOpacity
-        style={[styles.customDropdown, style]}
-        onPress={() => setIsVisible(true)}
+        style={[
+          styles.customDropdown,
+          style,
+          disabled && styles.disabledDropdown,
+        ]}
+        onPress={() => !disabled && setIsVisible(true)}
+        disabled={disabled}
       >
-        <Text style={styles.customDropdownText} numberOfLines={2}>
+        <Text
+          style={[styles.customDropdownText, disabled && styles.disabledText]}
+          numberOfLines={2}
+        >
           {selectedItem ? selectedItem.label : placeholder}
         </Text>
-        <Text style={styles.customDropdownArrow}>▼</Text>
+        <Text
+          style={[styles.customDropdownArrow, disabled && styles.disabledText]}
+        >
+          ▼
+        </Text>
       </TouchableOpacity>
 
       <Modal
         visible={isVisible}
         transparent={true}
         animationType="fade"
-        onRequestClose={() => setIsVisible(false)}
+        onRequestClose={handleClose}
       >
-        <TouchableOpacity
-          style={styles.modalOverlay}
-          onPress={() => setIsVisible(false)}
-        >
+        <TouchableOpacity style={styles.modalOverlay} onPress={handleClose}>
           <View
             style={styles.modalContent}
             onStartShouldSetResponder={() => true}
@@ -93,13 +146,22 @@ const CustomDropdown = ({
             <Text style={styles.modalTitle}>{placeholder}</Text>
 
             {searchable && (
-              <TextInput
-                style={styles.searchInput}
-                placeholder="Cari..."
-                value={searchText}
-                onChangeText={setSearchText}
-                autoFocus={true}
-              />
+              <View>
+                <TextInput
+                  style={styles.searchInput}
+                  placeholder="Ketik untuk mencari..."
+                  value={searchText}
+                  onChangeText={setSearchText}
+                  autoFocus={true}
+                  clearButtonMode="while-editing"
+                  returnKeyType="search"
+                />
+                {searchText.length > 0 && (
+                  <Text style={styles.searchResultText}>
+                    Ditemukan {filteredItems.length} hasil
+                  </Text>
+                )}
+              </View>
             )}
 
             <FlatList
@@ -107,6 +169,15 @@ const CustomDropdown = ({
               keyExtractor={(item) => item.value}
               showsVerticalScrollIndicator={false}
               style={styles.optionsList}
+              ListEmptyComponent={
+                searchable && searchText.length > 0 ? (
+                  <View style={styles.emptySearchContainer}>
+                    <Text style={styles.emptySearchText}>
+                      Tidak ada hasil untuk &quot;{searchText}&quot;
+                    </Text>
+                  </View>
+                ) : null
+              }
               renderItem={({ item }) => (
                 <TouchableOpacity
                   style={[
@@ -115,15 +186,7 @@ const CustomDropdown = ({
                   ]}
                   onPress={() => handleSelect(item)}
                 >
-                  <Text
-                    style={[
-                      styles.optionText,
-                      item.value === value && styles.selectedOptionText,
-                    ]}
-                    numberOfLines={0}
-                  >
-                    {item.label}
-                  </Text>
+                  {renderHighlightedText(item.label, searchText)}
                   {item.value === value && (
                     <Text style={styles.checkMark}>✓</Text>
                   )}
@@ -131,10 +194,7 @@ const CustomDropdown = ({
               )}
             />
 
-            <TouchableOpacity
-              style={styles.closeButton}
-              onPress={() => setIsVisible(false)}
-            >
+            <TouchableOpacity style={styles.closeButton} onPress={handleClose}>
               <Text style={styles.closeButtonText}>Tutup</Text>
             </TouchableOpacity>
           </View>
@@ -146,22 +206,286 @@ const CustomDropdown = ({
 
 export default function CreateTaskScreen() {
   const router = useRouter();
-  // Dropdown states
-  const [pekerjaan, setPekerjaan] = useState(pekerjaanDummy[0].value);
-  const [kegiatan, setKegiatan] = useState(kegiatanDummy[0].value);
-  const [proyek, setProyek] = useState(proyekDummy[0].value);
+
+  // API Data states
+  const [projectsData, setProjectsData] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [submitting, setSubmitting] = useState(false);
+
+  // Form states
+  const [selectedProject, setSelectedProject] = useState("");
+  const [selectedActivity, setSelectedActivity] = useState("");
+  const [selectedSubActivity, setSelectedSubActivity] = useState("");
   const [progress, setProgress] = useState("1.015");
   const [catatan, setCatatan] = useState(
     "Telah dilaksanakan mobilisasi untuk persiapan awal proyek. Kegiatan meliputi pembersihan lokasi dan pengiriman material tahap pertama."
   );
   const [koordinat, setKoordinat] = useState("");
-  const [uploadImages, setUploadImages] = useState([]); // dummy, not implemented
-  const [loading, setLoading] = useState(false);
+
+  // Fetch projects data on component mount
+  useEffect(() => {
+    fetchProjects();
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const fetchProjects = async () => {
+    try {
+      setLoading(true);
+
+      // For Expo Go on physical device, we need to use the computer's IP address
+      // The Expo server shows the IP as 192.168.11.122, so API server should be accessible there
+      const API_BASE_URL = "http://192.168.11.122:3000";
+
+      console.log(`Fetching from: ${API_BASE_URL}/api/full-projects`);
+      const response = await fetch(`${API_BASE_URL}/api/full-projects`);
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const result = await response.json();
+
+      if (result.success) {
+        setProjectsData(result.data);
+        console.log("Successfully loaded data from API");
+      } else {
+        Alert.alert("Error", "Gagal memuat data proyek");
+        // Use fallback mock data
+        setProjectsData(getMockData());
+      }
+    } catch (error) {
+      console.error("Error fetching projects:", error);
+      console.log("Using mock data as fallback");
+      // Show a brief notification that we're using mock data
+      Alert.alert(
+        "Koneksi Gagal",
+        "Tidak dapat terhubung ke API server. Pastikan:\n\n1. API server berjalan di http://192.168.11.122:3000\n2. HP dan komputer dalam WiFi yang sama\n\nMenggunakan data demo untuk sementara.",
+        [
+          { text: "Coba Lagi", onPress: () => fetchProjects() },
+          { text: "Lanjut dengan Demo", style: "cancel" },
+        ]
+      );
+      // Use fallback mock data when API fails
+      setProjectsData(getMockData());
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Mock data fallback for development
+  const getMockData = () => {
+    return [
+      {
+        id: "cm0txl9yk00015wjn8h2r3k7b",
+        pekerjaan: "Pembangunan Irigasi Desa Sukamaju",
+        penyediaJasa: "CV Maju Bersama",
+        nilaiKontrak: "Rp 5,500,000,000",
+        tanggalKontrak: "2025-01-15",
+        akhirKontrak: "2025-12-15",
+        fisikProgress: 25.5,
+        fisikTarget: 100,
+        activities: [
+          {
+            id: "act001",
+            name: "Pekerjaan Persiapan",
+            order: 1,
+            subActivities: [
+              {
+                id: "sub001",
+                name: "Pembersihan Lahan",
+                satuan: "m2",
+                volumeKontrak: 1500.0,
+                weight: 15.0,
+                order: 1,
+              },
+              {
+                id: "sub002",
+                name: "Pematokan",
+                satuan: "m",
+                volumeKontrak: 500.0,
+                weight: 10.0,
+                order: 2,
+              },
+            ],
+          },
+          {
+            id: "act002",
+            name: "Pekerjaan Galian",
+            order: 2,
+            subActivities: [
+              {
+                id: "sub003",
+                name: "Galian Saluran Primer",
+                satuan: "m3",
+                volumeKontrak: 2500.0,
+                weight: 30.0,
+                order: 1,
+              },
+              {
+                id: "sub004",
+                name: "Galian Saluran Sekunder",
+                satuan: "m3",
+                volumeKontrak: 1200.0,
+                weight: 20.0,
+                order: 2,
+              },
+            ],
+          },
+          {
+            id: "act003",
+            name: "Pekerjaan Struktur",
+            order: 3,
+            subActivities: [
+              {
+                id: "sub005",
+                name: "Pemasangan Pintu Air",
+                satuan: "unit",
+                volumeKontrak: 5.0,
+                weight: 15.0,
+                order: 1,
+              },
+              {
+                id: "sub006",
+                name: "Pembetonan Saluran",
+                satuan: "m",
+                volumeKontrak: 800.0,
+                weight: 10.0,
+                order: 2,
+              },
+            ],
+          },
+        ],
+      },
+      {
+        id: "cm0txl9yk00025wjn8h2r3k8c",
+        pekerjaan: "Rehabilitasi Jaringan Irigasi Cikampek",
+        penyediaJasa: "PT Bangun Karya",
+        nilaiKontrak: "Rp 8,200,000,000",
+        tanggalKontrak: "2025-02-01",
+        akhirKontrak: "2026-01-31",
+        fisikProgress: 45.2,
+        fisikTarget: 100,
+        activities: [
+          {
+            id: "act004",
+            name: "Pekerjaan Pembongkaran",
+            order: 1,
+            subActivities: [
+              {
+                id: "sub007",
+                name: "Pembongkaran Struktur Lama",
+                satuan: "m3",
+                volumeKontrak: 800.0,
+                weight: 20.0,
+                order: 1,
+              },
+            ],
+          },
+          {
+            id: "act005",
+            name: "Pekerjaan Rekonstruksi",
+            order: 2,
+            subActivities: [
+              {
+                id: "sub008",
+                name: "Pembuatan Pondasi",
+                satuan: "m3",
+                volumeKontrak: 600.0,
+                weight: 25.0,
+                order: 1,
+              },
+              {
+                id: "sub009",
+                name: "Pemasangan Dinding",
+                satuan: "m2",
+                volumeKontrak: 1500.0,
+                weight: 35.0,
+                order: 2,
+              },
+              {
+                id: "sub010",
+                name: "Finishing",
+                satuan: "m2",
+                volumeKontrak: 1500.0,
+                weight: 20.0,
+                order: 3,
+              },
+            ],
+          },
+        ],
+      },
+    ];
+  };
+
+  // Get dropdown options
+  const getProjectOptions = () => {
+    return projectsData.map((project: any) => ({
+      label: project.pekerjaan,
+      value: project.id,
+    }));
+  };
+
+  const getActivityOptions = () => {
+    if (!selectedProject) return [];
+
+    const project = projectsData.find((p: any) => p.id === selectedProject);
+    if (!project) return [];
+
+    return project.activities.map((activity: any) => ({
+      label: activity.name,
+      value: activity.id,
+    }));
+  };
+
+  const getSubActivityOptions = () => {
+    if (!selectedProject || !selectedActivity) return [];
+
+    const project = projectsData.find((p: any) => p.id === selectedProject);
+    if (!project) return [];
+
+    const activity = project.activities.find(
+      (a: any) => a.id === selectedActivity
+    );
+    if (!activity) return [];
+
+    return activity.subActivities.map((subActivity: any) => ({
+      label: subActivity.name,
+      value: subActivity.id,
+    }));
+  };
+
+  // Handle dropdown changes
+  const handleProjectChange = (projectId: any) => {
+    setSelectedProject(projectId);
+    setSelectedActivity(""); // Reset activity
+    setSelectedSubActivity(""); // Reset sub-activity
+  };
+
+  const handleActivityChange = (activityId: any) => {
+    setSelectedActivity(activityId);
+    setSelectedSubActivity(""); // Reset sub-activity
+  };
+
+  const handleSubActivityChange = (subActivityId: any) => {
+    setSelectedSubActivity(subActivityId);
+  };
 
   const handleSubmit = async () => {
-    setLoading(true);
+    if (!selectedProject) {
+      Alert.alert("Error", "Pilih proyek terlebih dahulu");
+      return;
+    }
+    if (!selectedActivity) {
+      Alert.alert("Error", "Pilih kegiatan terlebih dahulu");
+      return;
+    }
+    if (!selectedSubActivity) {
+      Alert.alert("Error", "Pilih sub kegiatan terlebih dahulu");
+      return;
+    }
+
+    setSubmitting(true);
     setTimeout(() => {
-      setLoading(false);
+      setSubmitting(false);
       const isSuccess = Math.random() > 0.2;
       if (isSuccess) {
         router.replace("/createTaskSuccess");
@@ -170,6 +494,20 @@ export default function CreateTaskScreen() {
       }
     }, 1200);
   };
+
+  if (loading) {
+    return (
+      <View style={styles.container}>
+        <View style={styles.topbar}>
+          <Text style={styles.topbarTitle}>Buat Laporan Harian</Text>
+        </View>
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color="#1a365d" />
+          <Text style={styles.loadingText}>Memuat data proyek...</Text>
+        </View>
+      </View>
+    );
+  }
 
   return (
     <View style={styles.container}>
@@ -193,35 +531,41 @@ export default function CreateTaskScreen() {
             <View style={[styles.formGroup, { zIndex: 1 }]}>
               <Text style={styles.label}>Pilih Proyek *</Text>
               <CustomDropdown
-                items={proyekDummy}
-                value={proyek}
-                onSelect={setProyek}
+                items={getProjectOptions()}
+                value={selectedProject}
+                onSelect={handleProjectChange}
                 placeholder="Pilih Proyek"
                 searchable={true}
               />
             </View>
-            {/* Pekerjaan Dropdown */}
-            <View style={[styles.formGroup, { zIndex: 1 }]}>
-              <Text style={styles.label}>Pilih Pekerjaan *</Text>
-              <CustomDropdown
-                items={pekerjaanDummy}
-                value={pekerjaan}
-                onSelect={setPekerjaan}
-                placeholder="Pilih Pekerjaan"
-                searchable={true}
-              />
-            </View>
-            {/* Kegiatan Dropdown */}
-            <View style={[styles.formGroup, { zIndex: 1 }]}>
-              <Text style={styles.label}>Pilih Kegiatan *</Text>
-              <CustomDropdown
-                items={kegiatanDummy}
-                value={kegiatan}
-                onSelect={setKegiatan}
-                placeholder="Pilih Kegiatan"
-                searchable={true}
-              />
-            </View>
+
+            {/* Kegiatan Dropdown - Only show if project is selected */}
+            {selectedProject && (
+              <View style={[styles.formGroup, { zIndex: 1 }]}>
+                <Text style={styles.label}>Pilih Kegiatan *</Text>
+                <CustomDropdown
+                  items={getActivityOptions()}
+                  value={selectedActivity}
+                  onSelect={handleActivityChange}
+                  placeholder="Pilih Kegiatan"
+                  searchable={true}
+                />
+              </View>
+            )}
+
+            {/* Sub Kegiatan Dropdown - Only show if activity is selected */}
+            {selectedActivity && (
+              <View style={[styles.formGroup, { zIndex: 1 }]}>
+                <Text style={styles.label}>Pilih Sub Kegiatan *</Text>
+                <CustomDropdown
+                  items={getSubActivityOptions()}
+                  value={selectedSubActivity}
+                  onSelect={handleSubActivityChange}
+                  placeholder="Pilih Sub Kegiatan"
+                  searchable={true}
+                />
+              </View>
+            )}
             {/* Progress */}
             <View style={styles.formGroup}>
               <Text style={styles.label}>Progress *</Text>
@@ -277,41 +621,14 @@ export default function CreateTaskScreen() {
                 />
               </View>
             </View>
-            {/* Example extra fields for scroll test (remove if not needed) */}
-            <View style={styles.formGroup}>
-              <Text style={styles.label}>tes</Text>
-              <TextInput
-                style={styles.input}
-                value={koordinat}
-                onChangeText={setKoordinat}
-                placeholder="Cari lokasi..."
-              />
-            </View>
-            <View style={styles.formGroup}>
-              <Text style={styles.label}>tes</Text>
-              <TextInput
-                style={styles.input}
-                value={koordinat}
-                onChangeText={setKoordinat}
-                placeholder="Cari lokasi..."
-              />
-            </View>
-            <View style={styles.formGroup}>
-              <Text style={styles.label}>tes</Text>
-              <TextInput
-                style={styles.input}
-                value={koordinat}
-                onChangeText={setKoordinat}
-                placeholder="Cari lokasi..."
-              />
-            </View>
+
             <TouchableOpacity
               style={styles.button}
               onPress={handleSubmit}
-              disabled={loading}
+              disabled={submitting}
             >
               <Text style={styles.buttonText}>
-                {loading ? "Mengirim..." : "Kirim Laporan"}
+                {submitting ? "Mengirim..." : "Kirim Laporan"}
               </Text>
             </TouchableOpacity>
           </View>
@@ -347,6 +664,16 @@ const styles = StyleSheet.create({
     fontWeight: "bold",
     letterSpacing: 1,
   },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  loadingText: {
+    marginTop: 10,
+    fontSize: 16,
+    color: "#6b7280",
+  },
   card: {
     backgroundColor: "#fff",
     borderRadius: 20,
@@ -381,11 +708,18 @@ const styles = StyleSheet.create({
     alignItems: "center",
     minHeight: 50,
   },
+  disabledDropdown: {
+    backgroundColor: "#f3f4f6",
+    borderColor: "#d1d5db",
+  },
   customDropdownText: {
     fontSize: 14,
     color: "#101828",
     flex: 1,
     paddingRight: 8,
+  },
+  disabledText: {
+    color: "#9ca3af",
   },
   customDropdownArrow: {
     fontSize: 12,
@@ -420,6 +754,26 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     fontSize: 14,
     marginBottom: 15,
+  },
+  searchResultText: {
+    fontSize: 12,
+    color: "#6b7280",
+    marginBottom: 10,
+    textAlign: "center",
+  },
+  emptySearchContainer: {
+    padding: 20,
+    alignItems: "center",
+  },
+  emptySearchText: {
+    fontSize: 14,
+    color: "#9ca3af",
+    textAlign: "center",
+  },
+  highlightedText: {
+    backgroundColor: "#fef3c7",
+    color: "#92400e",
+    fontWeight: "bold",
   },
   optionsList: {
     maxHeight: 300,
