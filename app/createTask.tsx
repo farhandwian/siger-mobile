@@ -228,7 +228,7 @@ export default function CreateTaskScreen() {
     return today.toISOString().split("T")[0];
   };
 
-  const [tanggalProgres] = useState(getTodayDate());
+  const [tanggalProgres, setTanggalProgres] = useState(getTodayDate());
 
   // Fetch projects data on component mount
   useEffect(() => {
@@ -498,6 +498,7 @@ export default function CreateTaskScreen() {
 
       // Prepare payload according to API specification
       const payload = {
+        user_id: "cmfb8i5yo0000vpgc5p776720",
         sub_activities_id: selectedSubActivity,
         tanggal_progres: tanggalProgres,
         progres_realisasi_per_hari: parseFloat(progress) || 0,
@@ -637,9 +638,9 @@ export default function CreateTaskScreen() {
             <View style={styles.formGroup}>
               <Text style={styles.label}>Tanggal Progres *</Text>
               <TextInput
-                style={[styles.input, styles.disabledInput]}
+                style={styles.input}
                 value={tanggalProgres}
-                editable={false}
+                onChangeText={setTanggalProgres}
                 placeholder="YYYY-MM-DD"
               />
             </View>
@@ -732,10 +733,7 @@ const styles = StyleSheet.create({
     borderBottomRightRadius: 24,
     marginBottom: 8,
     elevation: 4,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
+    boxShadow: "0px 2px 4px rgba(0, 0, 0, 0.1)",
   },
   topbarTitle: {
     color: "#fff",
@@ -759,10 +757,7 @@ const styles = StyleSheet.create({
     margin: 16,
     padding: 20,
     elevation: 3,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08,
-    shadowRadius: 8,
+    boxShadow: "0px 2px 8px rgba(0, 0, 0, 0.08)",
   },
   formGroup: {
     marginBottom: 18,
@@ -921,10 +916,7 @@ const styles = StyleSheet.create({
     paddingVertical: 16,
     alignItems: "center",
     marginTop: 16,
-    shadowColor: "#ffc928",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.15,
-    shadowRadius: 4,
+    boxShadow: "0px 2px 4px rgba(255, 201, 40, 0.15)",
   },
   buttonText: {
     color: "#1a365d",
