@@ -66,16 +66,17 @@ const CustomDropdown = ({
   };
 
   // Function to highlight searched text
-  const renderHighlightedText = (text: string, searchTerm: string, itemValue: any) => {
+  const renderHighlightedText = (
+    text: string,
+    searchTerm: string,
+    itemValue: any
+  ) => {
     const isSelected = itemValue === value;
-    
+
     if (!searchable || !searchTerm.trim()) {
       return (
         <Text
-          style={[
-            styles.optionText,
-            isSelected && styles.selectedOptionText,
-          ]}
+          style={[styles.optionText, isSelected && styles.selectedOptionText]}
           numberOfLines={0}
         >
           {text}
@@ -91,10 +92,7 @@ const CustomDropdown = ({
 
     return (
       <Text
-        style={[
-          styles.optionText,
-          isSelected && styles.selectedOptionText,
-        ]}
+        style={[styles.optionText, isSelected && styles.selectedOptionText]}
         numberOfLines={0}
       >
         {parts.map((part, index) =>
@@ -223,6 +221,14 @@ export default function CreateTaskScreen() {
     "Telah dilaksanakan mobilisasi untuk persiapan awal proyek. Kegiatan meliputi pembersihan lokasi dan pengiriman material tahap pertama."
   );
   const [koordinat, setKoordinat] = useState("");
+
+  // Get today's date in YYYY-MM-DD format
+  const getTodayDate = () => {
+    const today = new Date();
+    return today.toISOString().split("T")[0];
+  };
+
+  const [tanggalProgres] = useState(getTodayDate());
 
   // Fetch projects data on component mount
   useEffect(() => {
@@ -486,15 +492,73 @@ export default function CreateTaskScreen() {
     }
 
     setSubmitting(true);
-    setTimeout(() => {
-      setSubmitting(false);
-      const isSuccess = Math.random() > 0.2;
-      if (isSuccess) {
-        router.replace("/createTaskSuccess");
-      } else {
-        Alert.alert("Gagal", "Laporan gagal dikirim. Silakan coba lagi.");
+
+    try {
+      const API_BASE_URL = "http://192.168.11.122:3000";
+
+      // Prepare payload according to API specification
+      const payload = {
+        sub_activities_id: selectedSubActivity,
+        tanggal_progres: tanggalProgres,
+        progres_realisasi_per_hari: parseFloat(progress) || 0,
+        koordinat: {
+          latitude: -6.2088, // Dummy coordinates (Jakarta)
+          longitude: 106.8456,
+        },
+        catatan_kegiatan: catatan.trim(),
+        files: [
+          {
+            file: "progress_photo_1.jpg",
+            path: "/upload/progress/progress_photo_1.jpg",
+          },
+          {
+            file: "progress_photo_2.jpg",
+            path: "/upload/progress/progress_photo_2.jpg",
+          },
+          {
+            file: "progress_photo_3.jpg",
+            path: "/upload/progress/progress_photo_3.jpg",
+          },
+        ],
+      };
+
+      console.log("Submitting daily progress:", payload);
+
+      const response = await fetch(
+        `${API_BASE_URL}/api/daily-sub-activities-update`,
+        {
+          method: "PUT",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(payload),
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
       }
-    }, 1200);
+
+      const result = await response.json();
+
+      if (result.success) {
+        console.log("Daily progress updated successfully:", result);
+        Alert.alert("Berhasil", "Laporan harian berhasil dikirim!", [
+          { text: "OK", onPress: () => router.replace("/createTaskSuccess") },
+        ]);
+      } else {
+        throw new Error(result.message || "Failed to update daily progress");
+      }
+    } catch (error: any) {
+      console.error("Error submitting daily progress:", error);
+      Alert.alert(
+        "Gagal",
+        "Laporan gagal dikirim. Silakan coba lagi.\n\nDetail: " +
+          (error.message || error.toString())
+      );
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   if (loading) {
@@ -568,14 +632,27 @@ export default function CreateTaskScreen() {
                 />
               </View>
             )}
+
+            {/* Tanggal Progres */}
+            <View style={styles.formGroup}>
+              <Text style={styles.label}>Tanggal Progres *</Text>
+              <TextInput
+                style={[styles.input, styles.disabledInput]}
+                value={tanggalProgres}
+                editable={false}
+                placeholder="YYYY-MM-DD"
+              />
+            </View>
+
             {/* Progress */}
             <View style={styles.formGroup}>
-              <Text style={styles.label}>Progress *</Text>
+              <Text style={styles.label}>Progress (%) *</Text>
               <TextInput
                 style={styles.input}
                 value={progress}
                 onChangeText={setProgress}
                 keyboardType="numeric"
+                placeholder="Masukkan progress dalam persen (0-100)"
               />
             </View>
             {/* Catatan */}
@@ -826,6 +903,11 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     padding: 12,
     fontSize: 15,
+  },
+  disabledInput: {
+    backgroundColor: "#f3f4f6",
+    borderColor: "#d1d5db",
+    color: "#6b7280",
   },
   image: {
     width: 60,

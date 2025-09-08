@@ -182,7 +182,48 @@ api tersebut memiliki example response seperti ini:
 }
 
 --------------------------------------
+tolong buatkan input field tanggal yang mana nanti inputnya itu disablde dan disini dengan tanggal hari ini YYYY-MM-DD, jika pengguna megklik tombol kirim laporan maka akan menghit api PUT /api/daily-sub-activities-update, untuk koordinat dan files nya itu gunakan dummy data saja terlebih dahulu
 
+# Quick Reference: Mobile Daily Progress API
+
+## API Endpoint
+```
+PUT /api/daily-sub-activities-update
+```
+
+## Required Payload
+```json
+{
+  "sub_activities_id": "string",
+  "tanggal_progres": "YYYY-MM-DD", 
+  "progres_realisasi_per_hari": 0-100
+}
+```
+
+## Optional Fields
+```json
+{
+  "koordinat": {
+    "latitude": number,
+    "longitude": number
+  },
+  "catatan_kegiatan": "string",
+  "files": [
+    {
+      "file": "filename.jpg",
+      "path": "/upload/path/filename.jpg"
+    }
+  ]
+}
+```
+
+## Success Response
+```json
+{
+  "success": true,
+  "data": { /* updated record */ },
+  "message": "Daily progress updated successfully"
+}
 
 
 
