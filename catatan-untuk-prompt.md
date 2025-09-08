@@ -23,8 +23,7 @@ if its fail shown ui which inform user that process has been failed
 -------------------------------------------------
 https://www.figma.com/design/b20D1t97KXTnmihl9qnrme/SIGER?node-id=195-34323&m=dev
 
-
- 
+---------------------------------
 
 
 

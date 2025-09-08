@@ -14,6 +14,13 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import { LocationPickerForm } from "../components/LocationPickerForm";
+
+interface LocationValue {
+  latitude: number;
+  longitude: number;
+  address?: string;
+}
 
 const pekerjaanDummy = [
   {
@@ -38,8 +45,22 @@ const proyekDummy = [
   { label: "Proyek C", value: "proyekC" },
 ];
 
+interface DropdownItem {
+  label: string;
+  value: string;
+}
+
+interface CustomDropdownProps {
+  items: DropdownItem[];
+  value: string;
+  onSelect: (value: string) => void;
+  placeholder: string;
+  style?: any;
+  searchable?: boolean;
+}
+
 // Custom Dropdown Component
-const CustomDropdown = ({
+const CustomDropdown: React.FC<CustomDropdownProps> = ({
   items,
   value,
   onSelect,
@@ -58,7 +79,7 @@ const CustomDropdown = ({
 
   const selectedItem = items.find((item) => item.value === value);
 
-  const handleSelect = (item) => {
+  const handleSelect = (item: DropdownItem) => {
     onSelect(item.value);
     setIsVisible(false);
     setSearchText("");
@@ -154,7 +175,8 @@ export default function CreateTaskScreen() {
   const [catatan, setCatatan] = useState(
     "Telah dilaksanakan mobilisasi untuk persiapan awal proyek. Kegiatan meliputi pembersihan lokasi dan pengiriman material tahap pertama."
   );
-  const [koordinat, setKoordinat] = useState("");
+  const [lokasi, setLokasi] = useState<LocationValue | undefined>();
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [uploadImages, setUploadImages] = useState([]); // dummy, not implemented
   const [loading, setLoading] = useState(false);
 
@@ -242,14 +264,13 @@ export default function CreateTaskScreen() {
                 multiline
               />
             </View>
-            {/* Koordinat */}
+            {/* Lokasi */}
             <View style={styles.formGroup}>
               <Text style={styles.label}>Koordinat Lokasi</Text>
-              <TextInput
-                style={styles.input}
-                value={koordinat}
-                onChangeText={setKoordinat}
-                placeholder="Cari lokasi..."
+              <LocationPickerForm
+                value={lokasi}
+                onChange={setLokasi}
+                placeholder="Pilih lokasi pada peta..."
               />
             </View>
             {/* Gambar */}
@@ -282,27 +303,27 @@ export default function CreateTaskScreen() {
               <Text style={styles.label}>tes</Text>
               <TextInput
                 style={styles.input}
-                value={koordinat}
-                onChangeText={setKoordinat}
-                placeholder="Cari lokasi..."
+                value=""
+                onChangeText={() => {}}
+                placeholder="Test field..."
               />
             </View>
             <View style={styles.formGroup}>
               <Text style={styles.label}>tes</Text>
               <TextInput
                 style={styles.input}
-                value={koordinat}
-                onChangeText={setKoordinat}
-                placeholder="Cari lokasi..."
+                value=""
+                onChangeText={() => {}}
+                placeholder="Test field..."
               />
             </View>
             <View style={styles.formGroup}>
               <Text style={styles.label}>tes</Text>
               <TextInput
                 style={styles.input}
-                value={koordinat}
-                onChangeText={setKoordinat}
-                placeholder="Cari lokasi..."
+                value=""
+                onChangeText={() => {}}
+                placeholder="Test field..."
               />
             </View>
             <TouchableOpacity
