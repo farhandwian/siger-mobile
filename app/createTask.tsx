@@ -66,13 +66,15 @@ const CustomDropdown = ({
   };
 
   // Function to highlight searched text
-  const renderHighlightedText = (text: string, searchTerm: string) => {
+  const renderHighlightedText = (text: string, searchTerm: string, itemValue: any) => {
+    const isSelected = itemValue === value;
+    
     if (!searchable || !searchTerm.trim()) {
       return (
         <Text
           style={[
             styles.optionText,
-            value === value && styles.selectedOptionText,
+            isSelected && styles.selectedOptionText,
           ]}
           numberOfLines={0}
         >
@@ -91,7 +93,7 @@ const CustomDropdown = ({
       <Text
         style={[
           styles.optionText,
-          value === value && styles.selectedOptionText,
+          isSelected && styles.selectedOptionText,
         ]}
         numberOfLines={0}
       >
@@ -186,7 +188,7 @@ const CustomDropdown = ({
                   ]}
                   onPress={() => handleSelect(item)}
                 >
-                  {renderHighlightedText(item.label, searchText)}
+                  {renderHighlightedText(item.label, searchText, item.value)}
                   {item.value === value && (
                     <Text style={styles.checkMark}>✓</Text>
                   )}
@@ -792,12 +794,12 @@ const styles = StyleSheet.create({
   },
   optionText: {
     fontSize: 14,
-    color: "#101828",
+    color: "#101828", // Dark gray untuk text normal
     flex: 1,
     lineHeight: 20,
   },
   selectedOptionText: {
-    color: "#1d4ed8",
+    color: "#1d4ed8", // Blue hanya untuk item yang dipilih
     fontWeight: "500",
   },
   checkMark: {
