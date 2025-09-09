@@ -557,107 +557,98 @@ const DailyActivitiesScreen = () => {
 
   return (
     <View style={styles.container}>
-      {/* Topbar - matching createTask design */}
-      <View style={styles.topbar}>
-        <TouchableOpacity
-          style={styles.backButton}
-          onPress={() => router.back()}
-        >
-          <Text style={styles.backButtonText}>← Kembali</Text>
-        </TouchableOpacity>
-        <Text style={styles.topbarTitle}>dailyActivities</Text>
-        <View style={styles.backButton} />
-      </View>
-
-      {/* Add Report Button */}
-      <View style={styles.addButtonContainer}>
-        <TouchableOpacity
-          style={styles.addReportButton}
-          onPress={() => router.push("/createTask")}
-        >
-          <Text style={styles.addButtonIcon}>+</Text>
-          <Text style={styles.addReportButtonText}>Tambah Laporan</Text>
-        </TouchableOpacity>
-      </View>
-
-      {/* Search */}
-      <View style={styles.searchContainer}>
-        <Ionicons name="search" size={20} color="#6b7280" />
-        <TextInput
-          style={styles.searchInput}
-          placeholder="Search sub activities..."
-          value={searchQuery}
-          onChangeText={setSearchQuery}
-        />
-      </View>
-
-      {/* Filters Card */}
-      <View style={styles.filtersCard}>
-        {/* Project Filter */}
-        <View style={styles.formGroup}>
-          <Text style={styles.label}>Project</Text>
-          <CustomDropdown
-            items={[
-              { label: "All Projects", value: "" },
-              ...projects.map((project) => ({
-                label: project.pekerjaan,
-                value: project.id,
-              })),
-            ]}
-            value={selectedProjectId}
-            onSelect={handleProjectChange}
-            placeholder="Pilih Project"
-            searchable={true}
-          />
+      {/* Compact Search and Filters */}
+      <View style={styles.compactFiltersContainer}>
+        {/* Search and Add Button Row */}
+        <View style={styles.searchAndButtonRow}>
+          <View style={styles.searchRow}>
+            <Ionicons name="search" size={18} color="#6b7280" />
+            <TextInput
+              style={styles.compactSearchInput}
+              placeholder="Search activities..."
+              value={searchQuery}
+              onChangeText={setSearchQuery}
+            />
+          </View>
+          <TouchableOpacity
+            style={styles.addButtonInSearch}
+            onPress={() => router.push("/createTask")}
+          >
+            <Text style={styles.addButtonIcon}>+</Text>
+          </TouchableOpacity>
         </View>
 
-        {/* Activity Filter - Only show if project is selected */}
-        {selectedProjectId && (
-          <View style={styles.formGroup}>
-            <Text style={styles.label}>Activity</Text>
+        {/* Compact Filters Row */}
+        <View style={styles.filtersRow}>
+          <View style={styles.compactDropdownContainer}>
             <CustomDropdown
               items={[
-                { label: "All Activities", value: "" },
-                ...activities.map((activity) => ({
-                  label: activity.name,
-                  value: activity.id,
+                { label: "All Projects", value: "" },
+                ...projects.map((project) => ({
+                  label: project.pekerjaan,
+                  value: project.id,
                 })),
               ]}
-              value={selectedActivityId}
-              onSelect={handleActivityChange}
-              placeholder="Pilih Activity"
+              value={selectedProjectId}
+              onSelect={handleProjectChange}
+              placeholder="Project"
               searchable={true}
+              style={styles.compactDropdown}
             />
           </View>
-        )}
 
-        {/* Sub Activity Filter - Only show if activity is selected */}
-        {selectedActivityId && (
-          <View style={styles.formGroup}>
-            <Text style={styles.label}>Sub Activity</Text>
-            <CustomDropdown
-              items={[
-                { label: "All Sub Activities", value: "" },
-                ...subActivities.map((subActivity) => ({
-                  label: subActivity.name,
-                  value: subActivity.id,
-                })),
-              ]}
-              value={selectedSubActivityId}
-              onSelect={handleSubActivityChange}
-              placeholder="Pilih Sub Activity"
-              searchable={true}
-            />
-          </View>
-        )}
+          {selectedProjectId && (
+            <View style={styles.compactDropdownContainer}>
+              <CustomDropdown
+                items={[
+                  { label: "All Activities", value: "" },
+                  ...activities.map((activity) => ({
+                    label: activity.name,
+                    value: activity.id,
+                  })),
+                ]}
+                value={selectedActivityId}
+                onSelect={handleActivityChange}
+                placeholder="Activity"
+                searchable={true}
+                style={styles.compactDropdown}
+              />
+            </View>
+          )}
 
-        {/* Filter Buttons */}
-        <View style={styles.filterButtons}>
-          <TouchableOpacity style={styles.applyButton} onPress={applyFilters}>
-            <Text style={styles.applyButtonText}>Apply Filters</Text>
+          {selectedActivityId && (
+            <View style={styles.compactDropdownContainer}>
+              <CustomDropdown
+                items={[
+                  { label: "All Sub Activities", value: "" },
+                  ...subActivities.map((subActivity) => ({
+                    label: subActivity.name,
+                    value: subActivity.id,
+                  })),
+                ]}
+                value={selectedSubActivityId}
+                onSelect={handleSubActivityChange}
+                placeholder="Sub Activity"
+                searchable={true}
+                style={styles.compactDropdown}
+              />
+            </View>
+          )}
+        </View>
+
+        {/* Compact Filter Buttons */}
+        <View style={styles.compactFilterButtons}>
+          <TouchableOpacity
+            style={styles.compactApplyButton}
+            onPress={applyFilters}
+          >
+            <Text style={styles.compactApplyButtonText}>Apply</Text>
           </TouchableOpacity>
-          <TouchableOpacity style={styles.clearButton} onPress={clearFilters}>
-            <Text style={styles.clearButtonText}>Clear</Text>
+          <TouchableOpacity
+            style={styles.compactClearButton}
+            onPress={clearFilters}
+          >
+            <Text style={styles.compactClearButtonText}>Clear</Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -707,101 +698,100 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: "#f9fafb",
-    padding: 0,
   },
-  topbar: {
-    backgroundColor: "#1a365d",
-    paddingTop: 48,
-    paddingBottom: 16,
-    paddingHorizontal: 16,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    borderBottomLeftRadius: 24,
-    borderBottomRightRadius: 24,
-    marginBottom: 8,
-    elevation: 4,
-    boxShadow: "0px 2px 4px rgba(0, 0, 0, 0.1)",
-  },
-  topbarTitle: {
-    color: "#fff",
-    fontSize: 20,
-    fontWeight: "bold",
-    letterSpacing: 1,
-  },
-  backButton: {
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-    minWidth: 80,
-  },
-  backButtonText: {
-    color: "#fff",
-    fontSize: 14,
-    fontWeight: "500",
-  },
-  addButtonContainer: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    alignItems: "flex-end",
-  },
-  addReportButton: {
+  addButtonInSearch: {
     backgroundColor: "#ffc928",
-    borderRadius: 100,
-    paddingVertical: 12,
-    paddingHorizontal: 20,
-    flexDirection: "row",
+    borderRadius: 20,
+    width: 36,
+    height: 36,
+    justifyContent: "center",
     alignItems: "center",
     elevation: 2,
     boxShadow: "0px 2px 4px rgba(255, 201, 40, 0.15)",
+    flexShrink: 0,
   },
   addButtonIcon: {
     color: "#1a365d",
     fontSize: 18,
     fontWeight: "bold",
-    marginRight: 8,
   },
-  addReportButtonText: {
-    color: "#1a365d",
-    fontWeight: "bold",
-    fontSize: 14,
-  },
-  searchContainer: {
-    flexDirection: "row",
-    alignItems: "center",
+  // Compact filters container
+  compactFiltersContainer: {
     backgroundColor: "#fff",
-    borderRadius: 20,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
     marginHorizontal: 16,
-    marginBottom: 8,
+    marginTop: 16,
+    marginBottom: 12,
+    borderRadius: 12,
+    padding: 16,
     elevation: 2,
     boxShadow: "0px 2px 4px rgba(0, 0, 0, 0.08)",
-    gap: 12,
   },
-  searchInput: {
+  searchRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#f9fafb",
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    gap: 8,
+    minWidth: 0,
+    flexShrink: 1,
+    maxWidth: "80%",
+  },
+  compactSearchInput: {
     flex: 1,
-    fontSize: 15,
-    color: "#101828",
-  },
-  filtersCard: {
-    backgroundColor: "#fff",
-    borderRadius: 20,
-    margin: 16,
-    padding: 20,
-    elevation: 3,
-    boxShadow: "0px 2px 8px rgba(0, 0, 0, 0.08)",
-    marginBottom: 8,
-  },
-  formGroup: {
-    marginBottom: 18,
-    zIndex: 1,
-  },
-  label: {
     fontSize: 14,
     color: "#101828",
-    marginBottom: 4,
-    fontWeight: "600",
+    paddingVertical: 4,
+    minWidth: 0,
   },
+  searchAndButtonRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    marginBottom: 12,
+  },
+  filtersRow: {
+    gap: 8,
+    marginBottom: 12,
+  },
+  compactDropdownContainer: {
+    marginBottom: 8,
+  },
+  compactDropdown: {
+    minHeight: 40,
+    paddingVertical: 8,
+    paddingHorizontal: 10,
+  },
+  compactFilterButtons: {
+    flexDirection: "row",
+    gap: 8,
+  },
+  compactApplyButton: {
+    flex: 1,
+    backgroundColor: "#1a365d",
+    borderRadius: 6,
+    paddingVertical: 8,
+    alignItems: "center",
+  },
+  compactApplyButtonText: {
+    color: "#fff",
+    fontWeight: "600",
+    fontSize: 13,
+  },
+  compactClearButton: {
+    flex: 1,
+    backgroundColor: "#f3f4f6",
+    borderRadius: 6,
+    paddingVertical: 8,
+    alignItems: "center",
+  },
+  compactClearButtonText: {
+    color: "#6b7280",
+    fontWeight: "600",
+    fontSize: 13,
+  },
+
   // Custom Dropdown Styles (matching createTask)
   customDropdown: {
     backgroundColor: "#f9fafb",
@@ -924,35 +914,7 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: "500",
   },
-  filterButtons: {
-    flexDirection: "row",
-    gap: 12,
-    marginTop: 16,
-  },
-  applyButton: {
-    flex: 1,
-    backgroundColor: "#1a365d",
-    borderRadius: 8,
-    paddingVertical: 12,
-    alignItems: "center",
-  },
-  applyButtonText: {
-    color: "#fff",
-    fontWeight: "600",
-    fontSize: 14,
-  },
-  clearButton: {
-    flex: 1,
-    backgroundColor: "#f3f4f6",
-    borderRadius: 8,
-    paddingVertical: 12,
-    alignItems: "center",
-  },
-  clearButtonText: {
-    color: "#6b7280",
-    fontWeight: "600",
-    fontSize: 14,
-  },
+
   loadingContainer: {
     flex: 1,
     justifyContent: "center",
@@ -964,7 +926,9 @@ const styles = StyleSheet.create({
     color: "#666",
   },
   listContainer: {
-    padding: 16,
+    paddingHorizontal: 12,
+    paddingBottom: 16,
+    paddingTop: 4,
   },
   activityCard: {
     backgroundColor: "white",

@@ -233,7 +233,7 @@ tolonng buatkan ui untuk menampilkan list daily sub activities, dimana akan ada 
 ------------------------------------
 tolong tambahkan input untuk menyimpan gambar, user bisa melihat preview gambar tersebut dan juga bisa menghapus gambar tesrebut, lalu nantinya gambar tersebut akan disimpan di minio, minio akan mengembalikan link dan pathnya, lalu link dan path tersebut akan disimpan pada db.
 
-
+1.buat api upload file, delete file, 
 
 
 ------------------------
