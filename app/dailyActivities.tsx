@@ -10,105 +10,206 @@ import {
   useProjects,
 } from "@/hooks/useProjects";
 import { Ionicons } from "@expo/vector-icons";
+import { FlashList } from "@shopify/flash-list";
 import { router } from "expo-router";
-import React, { useEffect, useState, useRef } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
+  FlatList,
   Modal,
-  ScrollView,
   StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
   View,
 } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
-import { FlashList } from "@shopify/flash-list";
 
-// Custom Dropdown Component
-interface DropdownOption {
-  label: string;
-  value: string;
-}
-
-interface CustomDropdownProps {
-  label: string;
-  value: string;
-  options: DropdownOption[];
-  onSelect: (value: string) => void;
-  placeholder?: string;
-}
-
-const CustomDropdown: React.FC<CustomDropdownProps> = ({
-  label,
+// Custom Dropdown Component (matching createTask design)
+const CustomDropdown = ({
+  items,
   value,
-  options,
   onSelect,
-  placeholder = "Select an option",
+  placeholder,
+  style = {},
+  searchable = false,
+  disabled = false,
+}: {
+  items: any[];
+  value: any;
+  onSelect: (value: any) => void;
+  placeholder: string;
+  style?: any;
+  searchable?: boolean;
+  disabled?: boolean;
 }) => {
   const [isVisible, setIsVisible] = useState(false);
+  const [searchText, setSearchText] = useState("");
 
-  const selectedOption = options.find((option) => option.value === value);
+  const filteredItems = searchable
+    ? items.filter((item: any) => {
+        const searchLower = searchText.toLowerCase().trim();
+        const labelLower = item.label.toLowerCase();
+        // Search dalam label dengan multiple kata
+        return (
+          searchLower === "" ||
+          labelLower.includes(searchLower) ||
+          labelLower
+            .split(" ")
+            .some((word: string) => word.startsWith(searchLower))
+        );
+      })
+    : items;
+
+  const selectedItem = items.find((item: any) => item.value === value);
+
+  const handleSelect = (item: any) => {
+    onSelect(item.value);
+    setIsVisible(false);
+    setSearchText(""); // Reset search when closing
+  };
+
+  const handleClose = () => {
+    setIsVisible(false);
+    setSearchText(""); // Reset search when closing
+  };
+
+  // Function to highlight searched text
+  const renderHighlightedText = (
+    text: string,
+    searchTerm: string,
+    itemValue: any
+  ) => {
+    const isSelected = itemValue === value;
+
+    if (!searchable || !searchTerm.trim()) {
+      return (
+        <Text
+          style={[styles.optionText, isSelected && styles.selectedOptionText]}
+          numberOfLines={0}
+        >
+          {text}
+        </Text>
+      );
+    }
+
+    const regex = new RegExp(
+      `(${searchTerm.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")})`,
+      "gi"
+    );
+    const parts = text.split(regex);
+
+    return (
+      <Text
+        style={[styles.optionText, isSelected && styles.selectedOptionText]}
+        numberOfLines={0}
+      >
+        {parts.map((part, index) =>
+          regex.test(part) ? (
+            <Text key={index} style={styles.highlightedText}>
+              {part}
+            </Text>
+          ) : (
+            part
+          )
+        )}
+      </Text>
+    );
+  };
 
   return (
-    <View style={styles.dropdownContainer}>
-      <Text style={styles.dropdownLabel}>{label}</Text>
+    <>
       <TouchableOpacity
-        style={styles.dropdownButton}
-        onPress={() => setIsVisible(true)}
+        style={[
+          styles.customDropdown,
+          style,
+          disabled && styles.disabledDropdown,
+        ]}
+        onPress={() => !disabled && setIsVisible(true)}
+        disabled={disabled}
       >
         <Text
-          style={[
-            styles.dropdownButtonText,
-            !selectedOption && styles.placeholder,
-          ]}
+          style={[styles.customDropdownText, disabled && styles.disabledText]}
+          numberOfLines={2}
         >
-          {selectedOption ? selectedOption.label : placeholder}
+          {selectedItem ? selectedItem.label : placeholder}
         </Text>
-        <Ionicons name="chevron-down" size={20} color="#666" />
+        <Text
+          style={[styles.customDropdownArrow, disabled && styles.disabledText]}
+        >
+          ▼
+        </Text>
       </TouchableOpacity>
 
       <Modal
         visible={isVisible}
-        transparent
+        transparent={true}
         animationType="fade"
-        onRequestClose={() => setIsVisible(false)}
+        onRequestClose={handleClose}
       >
-        <TouchableOpacity
-          style={styles.modalOverlay}
-          activeOpacity={1}
-          onPress={() => setIsVisible(false)}
-        >
-          <View style={styles.modalContent}>
-            <ScrollView style={styles.optionsList}>
-              {options.map((option) => (
+        <TouchableOpacity style={styles.modalOverlay} onPress={handleClose}>
+          <View
+            style={styles.modalContent}
+            onStartShouldSetResponder={() => true}
+          >
+            <Text style={styles.modalTitle}>{placeholder}</Text>
+
+            {searchable && (
+              <View>
+                <TextInput
+                  style={styles.modalSearchInput}
+                  placeholder="Ketik untuk mencari..."
+                  value={searchText}
+                  onChangeText={setSearchText}
+                  autoFocus={true}
+                  clearButtonMode="while-editing"
+                  returnKeyType="search"
+                />
+                {searchText.length > 0 && (
+                  <Text style={styles.searchResultText}>
+                    Ditemukan {filteredItems.length} hasil
+                  </Text>
+                )}
+              </View>
+            )}
+
+            <FlatList
+              data={filteredItems}
+              keyExtractor={(item) => item.value}
+              showsVerticalScrollIndicator={false}
+              style={styles.optionsList}
+              ListEmptyComponent={
+                searchable && searchText.length > 0 ? (
+                  <View style={styles.emptySearchContainer}>
+                    <Text style={styles.emptySearchText}>
+                      Tidak ada hasil untuk &quot;{searchText}&quot;
+                    </Text>
+                  </View>
+                ) : null
+              }
+              renderItem={({ item }) => (
                 <TouchableOpacity
-                  key={option.value}
                   style={[
                     styles.optionItem,
-                    option.value === value && styles.selectedOption,
+                    item.value === value && styles.selectedOption,
                   ]}
-                  onPress={() => {
-                    onSelect(option.value);
-                    setIsVisible(false);
-                  }}
+                  onPress={() => handleSelect(item)}
                 >
-                  <Text
-                    style={[
-                      styles.optionText,
-                      option.value === value && styles.selectedOptionText,
-                    ]}
-                  >
-                    {option.label}
-                  </Text>
+                  {renderHighlightedText(item.label, searchText, item.value)}
+                  {item.value === value && (
+                    <Text style={styles.checkMark}>✓</Text>
+                  )}
                 </TouchableOpacity>
-              ))}
-            </ScrollView>
+              )}
+            />
+
+            <TouchableOpacity style={styles.closeButton} onPress={handleClose}>
+              <Text style={styles.closeButtonText}>Tutup</Text>
+            </TouchableOpacity>
           </View>
         </TouchableOpacity>
       </Modal>
-    </View>
+    </>
   );
 };
 
@@ -158,114 +259,135 @@ const DailyActivitiesScreen = () => {
   }, [fetchProjects]);
 
   // Load daily activities using hook
-  const loadDailyActivities = React.useCallback(async (
-    page: number = 1,
-    reset: boolean = false
-  ) => {
-    console.log('loadDailyActivities called', { page, reset });
-    
-    if (page === 1 && !reset) {
-      // Initial loading handled by hook
-    } else {
-      setIsLoadingMore(true);
-    }
+  const loadDailyActivities = React.useCallback(
+    async (page: number = 1, reset: boolean = false) => {
+      console.log("loadDailyActivities called", { page, reset });
 
-    try {
-      const params = {
-        page,
-        limit: 20,
-        sortBy: "updatedAt" as const,
-        sortOrder: "desc" as const,
-        ...(selectedProjectId && { projectId: selectedProjectId }),
-        ...(selectedActivityId && { activityId: selectedActivityId }),
-        ...(selectedSubActivityId && { subActivityId: selectedSubActivityId }),
-        ...(searchQuery.trim() && { search: searchQuery.trim() }),
-      };
+      if (page === 1 && !reset) {
+        // Initial loading handled by hook
+      } else {
+        setIsLoadingMore(true);
+      }
 
-      const result = await fetchDailyActivities(params);
+      try {
+        const params = {
+          page,
+          limit: 20,
+          sortBy: "updatedAt" as const,
+          sortOrder: "desc" as const,
+          ...(selectedProjectId && { projectId: selectedProjectId }),
+          ...(selectedActivityId && { activityId: selectedActivityId }),
+          ...(selectedSubActivityId && {
+            subActivityId: selectedSubActivityId,
+          }),
+          ...(searchQuery.trim() && { search: searchQuery.trim() }),
+        };
 
-      if (result) {
-        console.log('API Response:', { 
-          dataCount: result.data.length, 
-          pagination: result.pagination,
-          isReset: reset || page === 1
-        });
-        
-        if (reset || page === 1) {
-          setDailyActivities(result.data);
-          currentDataLengthRef.current = result.data.length;
-          console.log('Data reset, new count:', result.data.length);
-        } else {
-          // Save current state before updating data
-          const currentScrollPosition = scrollPositionRef.current;
-          const targetIndex = lastVisibleIndexRef.current;
+        const result = await fetchDailyActivities(params);
 
-          
-          // Filter out duplicates based on ID to prevent duplicate keys
-          setDailyActivities((prev) => {
-            const existingIds = new Set(prev.map(item => item.id));
-            const newData = result.data.filter(item => !existingIds.has(item.id));
-            const newTotal = [...prev, ...newData];
-            
-            console.log('Appending data:', { 
-              prevCount: prev.length, 
-              newDataCount: newData.length, 
-              totalAfter: newTotal.length,
-              targetIndex,
-              scrollPosition: currentScrollPosition
-            });
-            
-            // Update the current data length
-            currentDataLengthRef.current = newTotal.length;
-            
-            // Restore scroll position after data is updated
-            requestAnimationFrame(() => {
-              requestAnimationFrame(() => { // Double RAF for better timing
-                if (flashListRef.current) {
-                  // Try to scroll to the item that was last visible
-                  if (targetIndex >= 0 && targetIndex < newTotal.length) {
-                    const scrollToIndex = Math.max(0, targetIndex - 1);
-                    console.log('Restoring scroll to index:', scrollToIndex, 'total items:', newTotal.length);
-                    try {
-                      flashListRef.current.scrollToIndex({ 
-                        index: scrollToIndex,
+        if (result) {
+          console.log("API Response:", {
+            dataCount: result.data.length,
+            pagination: result.pagination,
+            isReset: reset || page === 1,
+          });
+
+          if (reset || page === 1) {
+            setDailyActivities(result.data);
+            currentDataLengthRef.current = result.data.length;
+            console.log("Data reset, new count:", result.data.length);
+          } else {
+            // Save current state before updating data
+            const currentScrollPosition = scrollPositionRef.current;
+            const targetIndex = lastVisibleIndexRef.current;
+
+            // Filter out duplicates based on ID to prevent duplicate keys
+            setDailyActivities((prev) => {
+              const existingIds = new Set(prev.map((item) => item.id));
+              const newData = result.data.filter(
+                (item) => !existingIds.has(item.id)
+              );
+              const newTotal = [...prev, ...newData];
+
+              console.log("Appending data:", {
+                prevCount: prev.length,
+                newDataCount: newData.length,
+                totalAfter: newTotal.length,
+                targetIndex,
+                scrollPosition: currentScrollPosition,
+              });
+
+              // Update the current data length
+              currentDataLengthRef.current = newTotal.length;
+
+              // Restore scroll position after data is updated
+              requestAnimationFrame(() => {
+                requestAnimationFrame(() => {
+                  // Double RAF for better timing
+                  if (flashListRef.current) {
+                    // Try to scroll to the item that was last visible
+                    if (targetIndex >= 0 && targetIndex < newTotal.length) {
+                      const scrollToIndex = Math.max(0, targetIndex - 1);
+                      console.log(
+                        "Restoring scroll to index:",
+                        scrollToIndex,
+                        "total items:",
+                        newTotal.length
+                      );
+                      try {
+                        flashListRef.current.scrollToIndex({
+                          index: scrollToIndex,
+                          animated: false,
+                          viewPosition: 0.1, // Show item very close to top
+                        });
+                      } catch {
+                        console.log(
+                          "ScrollToIndex failed, using calculated offset"
+                        );
+                        // Calculate offset based on item index and estimated height
+                        const estimatedItemHeight = 200; // Adjust based on your actual item height
+                        const calculatedOffset =
+                          scrollToIndex * estimatedItemHeight;
+                        flashListRef.current.scrollToOffset({
+                          offset: calculatedOffset,
+                          animated: false,
+                        });
+                      }
+                    } else if (currentScrollPosition > 100) {
+                      console.log(
+                        "Using offset fallback:",
+                        currentScrollPosition
+                      );
+                      flashListRef.current.scrollToOffset({
+                        offset: currentScrollPosition,
                         animated: false,
-                        viewPosition: 0.1 // Show item very close to top
-                      });
-                    } catch {
-                      console.log('ScrollToIndex failed, using calculated offset');
-                      // Calculate offset based on item index and estimated height
-                      const estimatedItemHeight = 200; // Adjust based on your actual item height
-                      const calculatedOffset = scrollToIndex * estimatedItemHeight;
-                      flashListRef.current.scrollToOffset({ 
-                        offset: calculatedOffset,
-                        animated: false 
                       });
                     }
-                  } else if (currentScrollPosition > 100) {
-                    console.log('Using offset fallback:', currentScrollPosition);
-                    flashListRef.current.scrollToOffset({ 
-                      offset: currentScrollPosition,
-                      animated: false 
-                    });
                   }
-                }
+                });
               });
+
+              return newTotal;
             });
-            
-            return newTotal;
-          });
+          }
+          setPagination(result.pagination);
         }
-        setPagination(result.pagination);
+      } catch (error) {
+        console.error("Error loading daily activities:", error);
+        Alert.alert("Error", "Failed to load daily activities");
+      } finally {
+        setIsLoadingMore(false);
+        setIsRefreshing(false);
       }
-    } catch (error) {
-      console.error("Error loading daily activities:", error);
-      Alert.alert("Error", "Failed to load daily activities");
-    } finally {
-      setIsLoadingMore(false);
-      setIsRefreshing(false);
-    }
-  }, [selectedProjectId, selectedActivityId, selectedSubActivityId, searchQuery, fetchDailyActivities]);
+    },
+    [
+      selectedProjectId,
+      selectedActivityId,
+      selectedSubActivityId,
+      searchQuery,
+      fetchDailyActivities,
+    ]
+  );
 
   // Handle project selection
   const handleProjectChange = (projectId: string) => {
@@ -318,16 +440,20 @@ const DailyActivitiesScreen = () => {
 
   // Load more data for infinite scroll
   const loadMore = React.useCallback(() => {
-    console.log('Load more triggered', { 
-      hasNextPage: pagination && pagination.page < pagination.totalPages, 
+    console.log("Load more triggered", {
+      hasNextPage: pagination && pagination.page < pagination.totalPages,
       isLoadingMore,
       currentPage: pagination?.page,
-      totalPages: pagination?.totalPages 
+      totalPages: pagination?.totalPages,
     });
-    
-    if (pagination && pagination.page < pagination.totalPages && !isLoadingMore) {
+
+    if (
+      pagination &&
+      pagination.page < pagination.totalPages &&
+      !isLoadingMore
+    ) {
       const nextPage = pagination.page + 1;
-      console.log('Loading next page:', nextPage);
+      console.log("Loading next page:", nextPage);
       loadDailyActivities(nextPage, false);
     }
   }, [pagination, isLoadingMore, loadDailyActivities]);
@@ -349,46 +475,49 @@ const DailyActivitiesScreen = () => {
   };
 
   // Render daily activity item
-  const renderDailyActivityItem = React.useCallback(({ item }: { item: DailySubActivity }) => (
-    <View style={styles.activityCard}>
-      <View style={styles.cardHeader}>
-        <Text style={styles.projectName}>
-          {item.subActivity.activity.project.pekerjaan}
-        </Text>
-        <Text style={styles.dateText}>{formatDate(item.tanggalProgres)}</Text>
-      </View>
-
-      <View style={styles.cardContent}>
-        <Text style={styles.activityName}>
-          {item.subActivity.activity.name}
-        </Text>
-        <Text style={styles.subActivityName}>{item.subActivity.name}</Text>
-
-        <View style={styles.progressContainer}>
-          <Text style={styles.progressLabel}>Progress:</Text>
-          <Text style={styles.progressValue}>
-            {item.progresRealisasiPerHari}%
+  const renderDailyActivityItem = React.useCallback(
+    ({ item }: { item: DailySubActivity }) => (
+      <View style={styles.activityCard}>
+        <View style={styles.cardHeader}>
+          <Text style={styles.projectName}>
+            {item.subActivity.activity.project.pekerjaan}
           </Text>
+          <Text style={styles.dateText}>{formatDate(item.tanggalProgres)}</Text>
         </View>
 
-        {item.catatanKegiatan && (
-          <Text style={styles.notes}>{item.catatanKegiatan}</Text>
-        )}
+        <View style={styles.cardContent}>
+          <Text style={styles.activityName}>
+            {item.subActivity.activity.name}
+          </Text>
+          <Text style={styles.subActivityName}>{item.subActivity.name}</Text>
 
-        {item.file && item.file.length > 0 && (
-          <View style={styles.fileContainer}>
-            <Ionicons name="document-attach" size={16} color="#666" />
-            <Text style={styles.fileText}>{item.file.length} file(s)</Text>
+          <View style={styles.progressContainer}>
+            <Text style={styles.progressLabel}>Progress:</Text>
+            <Text style={styles.progressValue}>
+              {item.progresRealisasiPerHari}%
+            </Text>
           </View>
-        )}
 
-        <View style={styles.userContainer}>
-          <Ionicons name="person" size={16} color="#666" />
-          <Text style={styles.userName}>{item.user.name}</Text>
+          {item.catatanKegiatan && (
+            <Text style={styles.notes}>{item.catatanKegiatan}</Text>
+          )}
+
+          {item.file && item.file.length > 0 && (
+            <View style={styles.fileContainer}>
+              <Ionicons name="document-attach" size={16} color="#666" />
+              <Text style={styles.fileText}>{item.file.length} file(s)</Text>
+            </View>
+          )}
+
+          <View style={styles.userContainer}>
+            <Ionicons name="person" size={16} color="#666" />
+            <Text style={styles.userName}>{item.user.name}</Text>
+          </View>
         </View>
       </View>
-    </View>
-  ), []);
+    ),
+    []
+  );
 
   // Render footer for loading more
   const renderFooter = () => {
@@ -412,95 +541,114 @@ const DailyActivitiesScreen = () => {
       const lastVisibleItem = viewableItems[viewableItems.length - 1];
       const firstVisibleItem = viewableItems[0];
       const newLastIndex = lastVisibleItem.index;
-      
+
       // Only log if there's significant change to reduce spam
       if (Math.abs(newLastIndex - lastVisibleIndexRef.current) > 2) {
-        console.log('Viewable items changed:', { 
-          first: firstVisibleItem.index, 
+        console.log("Viewable items changed:", {
+          first: firstVisibleItem.index,
           last: newLastIndex,
-          count: viewableItems.length 
+          count: viewableItems.length,
         });
       }
-      
+
       lastVisibleIndexRef.current = newLastIndex;
     }
   }).current;
 
   return (
-    <SafeAreaView style={styles.container}>
-      {/* Compact Filters */}
-      <View style={styles.compactFiltersContainer}>
-        {/* Add Report Button */}
+    <View style={styles.container}>
+      {/* Topbar - matching createTask design */}
+      <View style={styles.topbar}>
         <TouchableOpacity
-          style={styles.compactAddButton}
+          style={styles.backButton}
+          onPress={() => router.back()}
+        >
+          <Text style={styles.backButtonText}>← Kembali</Text>
+        </TouchableOpacity>
+        <Text style={styles.topbarTitle}>dailyActivities</Text>
+        <View style={styles.backButton} />
+      </View>
+
+      {/* Add Report Button */}
+      <View style={styles.addButtonContainer}>
+        <TouchableOpacity
+          style={styles.addReportButton}
           onPress={() => router.push("/createTask")}
         >
-          <Ionicons name="add" size={20} color="white" />
-          <Text style={styles.compactAddButtonText}>Tambah Laporan</Text>
+          <Text style={styles.addButtonIcon}>+</Text>
+          <Text style={styles.addReportButtonText}>Tambah Laporan</Text>
         </TouchableOpacity>
-        {/* Search */}
-        <View style={styles.searchContainer}>
-          <Ionicons
-            name="search"
-            size={20}
-            color="#666"
-            style={styles.searchIcon}
-          />
-          <TextInput
-            style={styles.searchInput}
-            placeholder="Search sub activities..."
-            value={searchQuery}
-            onChangeText={setSearchQuery}
+      </View>
+
+      {/* Search */}
+      <View style={styles.searchContainer}>
+        <Ionicons name="search" size={20} color="#6b7280" />
+        <TextInput
+          style={styles.searchInput}
+          placeholder="Search sub activities..."
+          value={searchQuery}
+          onChangeText={setSearchQuery}
+        />
+      </View>
+
+      {/* Filters Card */}
+      <View style={styles.filtersCard}>
+        {/* Project Filter */}
+        <View style={styles.formGroup}>
+          <Text style={styles.label}>Project</Text>
+          <CustomDropdown
+            items={[
+              { label: "All Projects", value: "" },
+              ...projects.map((project) => ({
+                label: project.pekerjaan,
+                value: project.id,
+              })),
+            ]}
+            value={selectedProjectId}
+            onSelect={handleProjectChange}
+            placeholder="Pilih Project"
+            searchable={true}
           />
         </View>
 
-        {/* Project Filter */}
-        <CustomDropdown
-          label="Project"
-          value={selectedProjectId}
-          options={[
-            { label: "All Projects", value: "" },
-            ...projects.map((project) => ({
-              label: project.pekerjaan,
-              value: project.id,
-            })),
-          ]}
-          onSelect={handleProjectChange}
-          placeholder="Select Project"
-        />
-
-        {/* Activity Filter */}
-        {activities.length > 0 && (
-          <CustomDropdown
-            label="Activity"
-            value={selectedActivityId}
-            options={[
-              { label: "All Activities", value: "" },
-              ...activities.map((activity) => ({
-                label: activity.name,
-                value: activity.id,
-              })),
-            ]}
-            onSelect={handleActivityChange}
-            placeholder="Select Activity"
-          />
+        {/* Activity Filter - Only show if project is selected */}
+        {selectedProjectId && (
+          <View style={styles.formGroup}>
+            <Text style={styles.label}>Activity</Text>
+            <CustomDropdown
+              items={[
+                { label: "All Activities", value: "" },
+                ...activities.map((activity) => ({
+                  label: activity.name,
+                  value: activity.id,
+                })),
+              ]}
+              value={selectedActivityId}
+              onSelect={handleActivityChange}
+              placeholder="Pilih Activity"
+              searchable={true}
+            />
+          </View>
         )}
 
-        {/* Sub Activity Filter */}
-        {subActivities.length > 0 && (
-          <CustomDropdown
-            label="Sub Activity"
-            value={selectedSubActivityId}
-            options={[
-              { label: "All Sub Activities", value: "" },
-              ...subActivities.map((subActivity) => ({
-                label: subActivity.name,
-                value: subActivity.id,
-              })),
-            ]}
-            onSelect={handleSubActivityChange}
-            placeholder="Select Sub Activity"
-          />
+        {/* Sub Activity Filter - Only show if activity is selected */}
+        {selectedActivityId && (
+          <View style={styles.formGroup}>
+            <Text style={styles.label}>Sub Activity</Text>
+            <CustomDropdown
+              items={[
+                { label: "All Sub Activities", value: "" },
+                ...subActivities.map((subActivity) => ({
+                  label: subActivity.name,
+                  value: subActivity.id,
+                })),
+              ]}
+              value={selectedSubActivityId}
+              onSelect={handleSubActivityChange}
+              placeholder="Pilih Sub Activity"
+              searchable={true}
+            />
+          </View>
         )}
 
         {/* Filter Buttons */}
@@ -525,7 +673,9 @@ const DailyActivitiesScreen = () => {
           ref={flashListRef}
           data={dailyActivities}
           renderItem={renderDailyActivityItem}
-          keyExtractor={(item, index) => `daily-activity-${item.id}-${item.tanggalProgres}-${index}`}
+          keyExtractor={(item, index) =>
+            `daily-activity-${item.id}-${item.tanggalProgres}-${index}`
+          }
           contentContainerStyle={styles.listContainer}
           onEndReached={loadMore}
           onEndReachedThreshold={0.5}
@@ -536,7 +686,7 @@ const DailyActivitiesScreen = () => {
           onViewableItemsChanged={onViewableItemsChanged}
           viewabilityConfig={{
             itemVisiblePercentThreshold: 30,
-            minimumViewTime: 100
+            minimumViewTime: 100,
           }}
           ListFooterComponent={renderFooter}
           refreshing={isRefreshing}
@@ -547,120 +697,140 @@ const DailyActivitiesScreen = () => {
               <Text style={styles.emptyText}>No daily activities found</Text>
             </View>
           }
-
         />
       )}
-    </SafeAreaView>
+    </View>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#f5f5f5",
+    backgroundColor: "#f9fafb",
+    padding: 0,
   },
-  compactFiltersContainer: {
-    backgroundColor: "white",
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderBottomWidth: 1,
-    borderBottomColor: "#eee",
-  },
-  compactAddButton: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: "#007AFF",
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 6,
-    alignSelf: "flex-end",
-    marginBottom: 8,
-  },
-  compactAddButtonText: {
-    color: "white",
-    fontWeight: "600",
-    marginLeft: 4,
-    fontSize: 14,
-  },
-  header: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
+  topbar: {
+    backgroundColor: "#1a365d",
+    paddingTop: 48,
+    paddingBottom: 16,
     paddingHorizontal: 16,
-    paddingVertical: 12,
-    backgroundColor: "white",
-    borderBottomWidth: 1,
-    borderBottomColor: "#eee",
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    borderBottomLeftRadius: 24,
+    borderBottomRightRadius: 24,
+    marginBottom: 8,
+    elevation: 4,
+    boxShadow: "0px 2px 4px rgba(0, 0, 0, 0.1)",
   },
-  headerTitle: {
+  topbarTitle: {
+    color: "#fff",
     fontSize: 20,
     fontWeight: "bold",
-    color: "#333",
+    letterSpacing: 1,
   },
-  addButton: {
+  backButton: {
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    minWidth: 80,
+  },
+  backButtonText: {
+    color: "#fff",
+    fontSize: 14,
+    fontWeight: "500",
+  },
+  addButtonContainer: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    alignItems: "flex-end",
+  },
+  addReportButton: {
+    backgroundColor: "#ffc928",
+    borderRadius: 100,
+    paddingVertical: 12,
+    paddingHorizontal: 20,
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "#007AFF",
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 8,
+    elevation: 2,
+    boxShadow: "0px 2px 4px rgba(255, 201, 40, 0.15)",
   },
-  addButtonText: {
-    color: "white",
-    fontWeight: "600",
-    marginLeft: 4,
+  addButtonIcon: {
+    color: "#1a365d",
+    fontSize: 18,
+    fontWeight: "bold",
+    marginRight: 8,
   },
-  filtersContainer: {
-    backgroundColor: "white",
-    padding: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: "#eee",
+  addReportButtonText: {
+    color: "#1a365d",
+    fontWeight: "bold",
+    fontSize: 14,
   },
   searchContainer: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "#f8f8f8",
-    borderRadius: 6,
-    paddingHorizontal: 10,
+    backgroundColor: "#fff",
+    borderRadius: 20,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    marginHorizontal: 16,
     marginBottom: 8,
-    height: 40,
-  },
-  searchIcon: {
-    marginRight: 8,
+    elevation: 2,
+    boxShadow: "0px 2px 4px rgba(0, 0, 0, 0.08)",
+    gap: 12,
   },
   searchInput: {
     flex: 1,
-    paddingVertical: 8,
-    fontSize: 14,
+    fontSize: 15,
+    color: "#101828",
   },
-  // Dropdown styles
-  dropdownContainer: {
+  filtersCard: {
+    backgroundColor: "#fff",
+    borderRadius: 20,
+    margin: 16,
+    padding: 20,
+    elevation: 3,
+    boxShadow: "0px 2px 8px rgba(0, 0, 0, 0.08)",
     marginBottom: 8,
   },
-  dropdownLabel: {
-    fontSize: 12,
-    fontWeight: "600",
-    color: "#333",
-    marginBottom: 3,
+  formGroup: {
+    marginBottom: 18,
+    zIndex: 1,
   },
-  dropdownButton: {
+  label: {
+    fontSize: 14,
+    color: "#101828",
+    marginBottom: 4,
+    fontWeight: "600",
+  },
+  // Custom Dropdown Styles (matching createTask)
+  customDropdown: {
+    backgroundColor: "#f9fafb",
+    borderColor: "#e5e7eb",
+    borderWidth: 1,
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 12,
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    backgroundColor: "#f8f8f8",
-    borderRadius: 6,
-    paddingHorizontal: 10,
-    paddingVertical: 8,
-    borderWidth: 1,
-    borderColor: "#ddd",
-    height: 36,
+    minHeight: 50,
   },
-  dropdownButtonText: {
+  disabledDropdown: {
+    backgroundColor: "#f3f4f6",
+    borderColor: "#d1d5db",
+  },
+  customDropdownText: {
     fontSize: 14,
-    color: "#333",
+    color: "#101828",
+    flex: 1,
+    paddingRight: 8,
   },
-  placeholder: {
-    color: "#999",
+  disabledText: {
+    color: "#9ca3af",
+  },
+  customDropdownArrow: {
+    fontSize: 12,
+    color: "#6b7280",
   },
   modalOverlay: {
     flex: 1,
@@ -669,65 +839,117 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   modalContent: {
-    backgroundColor: "white",
+    backgroundColor: "#fff",
     borderRadius: 12,
-    maxHeight: "60%",
-    width: "80%",
-    shadowColor: "#000",
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.25,
-    shadowRadius: 3.84,
-    elevation: 5,
+    padding: 20,
+    width: "90%",
+    maxHeight: "80%",
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: "bold",
+    color: "#101828",
+    marginBottom: 15,
+    textAlign: "center",
+  },
+  modalSearchInput: {
+    backgroundColor: "#f9fafb",
+    borderColor: "#e5e7eb",
+    borderWidth: 1,
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    fontSize: 14,
+    marginBottom: 15,
+  },
+  searchResultText: {
+    fontSize: 12,
+    color: "#6b7280",
+    marginBottom: 10,
+    textAlign: "center",
+  },
+  emptySearchContainer: {
+    padding: 20,
+    alignItems: "center",
+  },
+  emptySearchText: {
+    fontSize: 14,
+    color: "#9ca3af",
+    textAlign: "center",
+  },
+  highlightedText: {
+    backgroundColor: "#fef3c7",
+    color: "#92400e",
+    fontWeight: "bold",
   },
   optionsList: {
     maxHeight: 300,
   },
   optionItem: {
-    paddingHorizontal: 16,
     paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: "#f0f0f0",
+    paddingHorizontal: 15,
+    borderBottomWidth: 0.5,
+    borderBottomColor: "#e5e7eb",
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
   },
   selectedOption: {
-    backgroundColor: "#e3f2fd",
+    backgroundColor: "#f0f9ff",
   },
   optionText: {
-    fontSize: 16,
-    color: "#333",
+    fontSize: 14,
+    color: "#101828",
+    flex: 1,
+    lineHeight: 20,
   },
   selectedOptionText: {
-    color: "#007AFF",
-    fontWeight: "600",
+    color: "#1d4ed8",
+    fontWeight: "500",
+  },
+  checkMark: {
+    color: "#1d4ed8",
+    fontSize: 16,
+    fontWeight: "bold",
+  },
+  closeButton: {
+    backgroundColor: "#1a365d",
+    borderRadius: 8,
+    paddingVertical: 12,
+    alignItems: "center",
+    marginTop: 15,
+  },
+  closeButtonText: {
+    color: "#fff",
+    fontSize: 16,
+    fontWeight: "500",
   },
   filterButtons: {
     flexDirection: "row",
-    gap: 8,
-    marginTop: 6,
+    gap: 12,
+    marginTop: 16,
   },
   applyButton: {
     flex: 1,
-    backgroundColor: "#007AFF",
-    paddingVertical: 8,
-    borderRadius: 6,
+    backgroundColor: "#1a365d",
+    borderRadius: 8,
+    paddingVertical: 12,
     alignItems: "center",
   },
   applyButtonText: {
-    color: "white",
+    color: "#fff",
     fontWeight: "600",
     fontSize: 14,
   },
   clearButton: {
     flex: 1,
-    backgroundColor: "#f8f8f8",
-    paddingVertical: 8,
-    borderRadius: 6,
+    backgroundColor: "#f3f4f6",
+    borderRadius: 8,
+    paddingVertical: 12,
     alignItems: "center",
   },
   clearButtonText: {
-    color: "#666",
+    color: "#6b7280",
     fontWeight: "600",
     fontSize: 14,
   },

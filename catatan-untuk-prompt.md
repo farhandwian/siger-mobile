@@ -233,6 +233,9 @@ tolonng buatkan ui untuk menampilkan list daily sub activities, dimana akan ada 
 ------------------------------------
 tolong tambahkan input untuk menyimpan gambar, user bisa melihat preview gambar tersebut dan juga bisa menghapus gambar tesrebut, lalu nantinya gambar tersebut akan disimpan di minio, minio akan mengembalikan link dan pathnya, lalu link dan path tersebut akan disimpan pada db.
 
+
+
+
 ------------------------
 ternyata setiap merfersesh data dibawahnya, datanya itu pasti kembali ke salah satu data dengan progres 9.96. jika terlalu suilit ubah pendekatan nya anda bisa menggunaakan ini @shopify/flash-list, dengan referensi kode ini:
 https://medium.com/@andrew.chester/react-native-infinite-scrolling-with-lazy-loading-a-step-by-step-guide-e91647348689
