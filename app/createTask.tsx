@@ -239,9 +239,9 @@ export default function CreateTaskScreen() {
     try {
       setLoading(true);
 
-      // For Expo Go on physical device, we need to use the computer's IP address
-      // The Expo server shows the IP as 192.168.11.122, so API server should be accessible there
-      const API_BASE_URL = "http://192.168.11.122:3000";
+      // Get API base URL from environment variables
+      const API_BASE_URL =
+        process.env.EXPO_PUBLIC_API_BASE_URL || "http://localhost:3000";
 
       console.log(`Fetching from: ${API_BASE_URL}/api/full-projects`);
       const response = await fetch(`${API_BASE_URL}/api/full-projects`);
@@ -264,9 +264,11 @@ export default function CreateTaskScreen() {
       console.error("Error fetching projects:", error);
       console.log("Using mock data as fallback");
       // Show a brief notification that we're using mock data
+      const currentApiUrl =
+        process.env.EXPO_PUBLIC_API_BASE_URL || "http://localhost:3000";
       Alert.alert(
         "Koneksi Gagal",
-        "Tidak dapat terhubung ke API server. Pastikan:\n\n1. API server berjalan di http://192.168.11.122:3000\n2. HP dan komputer dalam WiFi yang sama\n\nMenggunakan data demo untuk sementara.",
+        `Tidak dapat terhubung ke API server. Pastikan:\n\n1. API server berjalan di ${currentApiUrl}\n2. HP dan komputer dalam WiFi yang sama\n\nMenggunakan data demo untuk sementara.`,
         [
           { text: "Coba Lagi", onPress: () => fetchProjects() },
           { text: "Lanjut dengan Demo", style: "cancel" },
@@ -494,7 +496,9 @@ export default function CreateTaskScreen() {
     setSubmitting(true);
 
     try {
-      const API_BASE_URL = "http://192.168.11.122:3000";
+      // Get API base URL from environment variables
+      const API_BASE_URL =
+        process.env.EXPO_PUBLIC_API_BASE_URL || "http://localhost:3000";
 
       // Prepare payload according to API specification
       const payload = {
