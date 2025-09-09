@@ -15,6 +15,7 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import MapLocationPicker, { LocationValue } from "../components/MapLocationPicker";
 
 // Custom Dropdown Component
 const CustomDropdown = ({
@@ -220,7 +221,7 @@ export default function CreateTaskScreen() {
   const [catatan, setCatatan] = useState(
     "Telah dilaksanakan mobilisasi untuk persiapan awal proyek. Kegiatan meliputi pembersihan lokasi dan pengiriman material tahap pertama."
   );
-  const [koordinat, setKoordinat] = useState("");
+  const [location, setLocation] = useState<LocationValue | undefined>(undefined);
 
   // Get today's date in YYYY-MM-DD format
   const getTodayDate = () => {
@@ -241,7 +242,7 @@ export default function CreateTaskScreen() {
 
       // For Expo Go on physical device, we need to use the computer's IP address
       // The Expo server shows the IP as 192.168.11.122, so API server should be accessible there
-      const API_BASE_URL = "http://192.168.11.122:3000";
+      const API_BASE_URL = "http://10.44.44.20:3000";
 
       console.log(`Fetching from: ${API_BASE_URL}/api/full-projects`);
       const response = await fetch(`${API_BASE_URL}/api/full-projects`);
@@ -266,7 +267,7 @@ export default function CreateTaskScreen() {
       // Show a brief notification that we're using mock data
       Alert.alert(
         "Koneksi Gagal",
-        "Tidak dapat terhubung ke API server. Pastikan:\n\n1. API server berjalan di http://192.168.11.122:3000\n2. HP dan komputer dalam WiFi yang sama\n\nMenggunakan data demo untuk sementara.",
+        "Tidak dapat terhubung ke API server. Pastikan:\n\n1. API server berjalan di http://10.44.44.20:3000\n2. HP dan komputer dalam WiFi yang sama\n\nMenggunakan data demo untuk sementara.",
         [
           { text: "Coba Lagi", onPress: () => fetchProjects() },
           { text: "Lanjut dengan Demo", style: "cancel" },
@@ -502,8 +503,11 @@ export default function CreateTaskScreen() {
         sub_activities_id: selectedSubActivity,
         tanggal_progres: tanggalProgres,
         progres_realisasi_per_hari: parseFloat(progress) || 0,
-        koordinat: {
-          latitude: -6.2088, // Dummy coordinates (Jakarta)
+        koordinat: location ? {
+          latitude: location.latitude,
+          longitude: location.longitude,
+        } : {
+          latitude: -6.2088, // Default Jakarta coordinates
           longitude: 106.8456,
         },
         catatan_kegiatan: catatan.trim(),
@@ -666,16 +670,50 @@ export default function CreateTaskScreen() {
                 multiline
               />
             </View>
-            {/* Koordinat */}
+            {/* Koordinat Lokasi dengan Peta */}
             <View style={styles.formGroup}>
               <Text style={styles.label}>Koordinat Lokasi</Text>
-              <TextInput
-                style={styles.input}
-                value={koordinat}
-                onChangeText={setKoordinat}
-                placeholder="Cari lokasi..."
+              <MapLocationPicker
+                value={location}
+                onChange={setLocation}
+                height={250}
+                showMyLocationButton={true}
               />
             </View>
+
+            {/* Latitude & Longitude Display */}
+            {location && (
+              <>
+                <View style={styles.formGroup}>
+                  <Text style={styles.label}>Latitude</Text>
+                  <TextInput
+                    style={[styles.input, styles.disabledInput]}
+                    value={location.latitude.toFixed(6)}
+                    editable={false}
+                  />
+                </View>
+                <View style={styles.formGroup}>
+                  <Text style={styles.label}>Longitude</Text>
+                  <TextInput
+                    style={[styles.input, styles.disabledInput]}
+                    value={location.longitude.toFixed(6)}
+                    editable={false}
+                  />
+                </View>
+                {location.address && (
+                  <View style={styles.formGroup}>
+                    <Text style={styles.label}>Alamat</Text>
+                    <TextInput
+                      style={styles.input}
+                      value={location.address}
+                      onChangeText={(text) => setLocation({ ...location, address: text })}
+                      multiline
+                      placeholder="Alamat dapat diedit manual jika diperlukan"
+                    />
+                  </View>
+                )}
+              </>
+            )}
             {/* Gambar */}
             <View style={styles.formGroup}>
               <Text style={styles.label}>Gambar Kegiatan (Max 5MB)</Text>
