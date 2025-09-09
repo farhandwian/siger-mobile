@@ -9,7 +9,7 @@ const LoginScreen = () => {
 
   const handleLogin = () => {
     // Dummy login, always success
-    router.replace("/createTask");
+    router.replace("/dailyActivities");
   };
 
   return (

@@ -225,9 +225,16 @@ PUT /api/daily-sub-activities-update
   "message": "Daily progress updated successfully"
 }
 
+---------------------------------------
+
+tolonng buatkan ui untuk menampilkan list daily sub activities, dimana akan ada filter untuk data projects, activities, dan sub_activities, saya ingin ada juga search berdasarkan nama sub_activities. lalu tolong buatkan juga pagination mengguankan infinite scroll. lalu pada halaman tersebut tolong tambahkan button tambah laporan yang jika diklik akan meredirect ke app\createTask.tsx.
 
 
- 
+------------------------------------
+tolong tambahkan input untuk menyimpan gambar, user bisa melihat preview gambar tersebut dan juga bisa menghapus gambar tesrebut, lalu nantinya gambar tersebut akan disimpan di minio, minio akan mengembalikan link dan pathnya, lalu link dan path tersebut akan disimpan pada db.
 
+------------------------
+ternyata setiap merfersesh data dibawahnya, datanya itu pasti kembali ke salah satu data dengan progres 9.96. jika terlalu suilit ubah pendekatan nya anda bisa menggunaakan ini @shopify/flash-list, dengan referensi kode ini:
+https://medium.com/@andrew.chester/react-native-infinite-scrolling-with-lazy-loading-a-step-by-step-guide-e91647348689
 
-
+tolong juga hilangkana bagina tampilan menu yang ada tulisan home, explore, dan dailyactivitie. lalu tolong hilangkan bagian atas dari menu yang berbentuk rectagle bewarna abu-abu , lalu perkecil tampilan untuk search dan filternya, tujuannya adalah agar list data mendapatkan ruang, supaya pengguan lebih enak membacanya

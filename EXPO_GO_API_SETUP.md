@@ -4,12 +4,12 @@
 Ketika menggunakan Expo Go di HP, aplikasi tidak bisa mengakses `localhost` dari komputer karena HP dan komputer berada di network yang berbeda.
 
 ## Solusi
-API server harus berjalan di IP address yang sama dengan Expo server: `192.168.11.122`
+API server harus berjalan di IP address yang sama dengan Expo server: `10.44.44.12`
 
 ## Langkah-langkah:
 
 ### 1. Cek IP Address Komputer
-Dari output Expo server, IP address komputer adalah: `192.168.11.122`
+Dari output Expo server, IP address komputer adalah: `10.44.44.12`
 
 ### 2. Jalankan API Server di IP Address Tersebut
 
@@ -28,12 +28,12 @@ npm start -- --host 0.0.0.0 --port 3000
 - **NestJS**: `npm run start:dev -- --host 0.0.0.0`
 
 ### 3. Test dari Browser
-Buka di browser komputer: `http://192.168.11.122:3000/api/full-projects`
+Buka di browser komputer: `http://10.44.44.12:3000/api/full-projects`
 Harus mengembalikan response JSON yang benar.
 
 ### 4. Test dari HP
 Setelah API server berjalan di `0.0.0.0:3000`, aplikasi Expo Go di HP akan bisa mengakses:
-`http://192.168.11.122:3000/api/full-projects`
+`http://10.44.44.12:3000/api/full-projects`
 
 ## Troubleshooting:
 
@@ -46,13 +46,13 @@ Setelah API server berjalan di `0.0.0.0:3000`, aplikasi Expo Go di HP akan bisa 
 ### Cara cek apakah API server sudah benar:
 ```bash
 # Dari komputer, test:
-curl http://192.168.11.122:3000/api/full-projects
+curl http://10.44.44.12:3000/api/full-projects
 
 # Atau buka di browser:
-http://192.168.11.122:3000/api/full-projects
+http://10.44.44.12:3000/api/full-projects
 ```
 
 ## Catatan:
 - `localhost` hanya bisa diakses dari komputer yang sama
 - `0.0.0.0` memungkinkan akses dari network lain (termasuk HP)
-- IP `192.168.11.122` adalah IP komputer di network WiFi
+- IP `10.44.44.12` adalah IP komputer di network WiFi

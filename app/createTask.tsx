@@ -570,7 +570,14 @@ export default function CreateTaskScreen() {
     return (
       <View style={styles.container}>
         <View style={styles.topbar}>
+          <TouchableOpacity 
+            style={styles.backButton}
+            onPress={() => router.back()}
+          >
+            <Text style={styles.backButtonText}>← Kembali</Text>
+          </TouchableOpacity>
           <Text style={styles.topbarTitle}>Buat Laporan Harian</Text>
+          <View style={styles.backButton} />
         </View>
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color="#1a365d" />
@@ -584,7 +591,14 @@ export default function CreateTaskScreen() {
     <View style={styles.container}>
       {/* Topbar */}
       <View style={styles.topbar}>
+        <TouchableOpacity 
+          style={styles.backButton}
+          onPress={() => router.back()}
+        >
+          <Text style={styles.backButtonText}>← Kembali</Text>
+        </TouchableOpacity>
         <Text style={styles.topbarTitle}>Buat Laporan Harian</Text>
+        <View style={styles.backButton} />
       </View>
       <KeyboardAvoidingView
         style={{ flex: 1 }}
@@ -732,7 +746,10 @@ const styles = StyleSheet.create({
     backgroundColor: "#1a365d",
     paddingTop: 48,
     paddingBottom: 16,
+    paddingHorizontal: 16,
+    flexDirection: "row",
     alignItems: "center",
+    justifyContent: "space-between",
     borderBottomLeftRadius: 24,
     borderBottomRightRadius: 24,
     marginBottom: 8,
@@ -926,5 +943,15 @@ const styles = StyleSheet.create({
     color: "#1a365d",
     fontWeight: "bold",
     fontSize: 16,
+  },
+  backButton: {
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    minWidth: 80,
+  },
+  backButtonText: {
+    color: "#fff",
+    fontSize: 14,
+    fontWeight: "500",
   },
 });
