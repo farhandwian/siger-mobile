@@ -1,5 +1,5 @@
 import { useRouter } from "expo-router";
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -229,10 +229,19 @@ const ImageUploadComponent = ({
   maxSize = 5 * 1024 * 1024, // 5MB default
 }: {
   images: ImageData[];
-  onImagesChange: (images: ImageData[]) => void;
+  onImagesChange: (
+    images: ImageData[] | ((prev: ImageData[]) => ImageData[])
+  ) => void;
   maxImages?: number;
   maxSize?: number;
 }) => {
+  // Use ref to track latest images state for closures
+  const imagesRef = useRef<ImageData[]>(images);
+
+  // Update ref whenever images prop changes
+  useEffect(() => {
+    imagesRef.current = images;
+  }, [images]);
   // Fungsi untuk meminta permission kamera dan galeri
   const requestPermissions = async () => {
     try {
@@ -408,10 +417,20 @@ const ImageUploadComponent = ({
 
       // Tambahkan gambar ke array
       const updatedImages = [...images, newImage];
+      console.log("📸 Adding single image to state:", {
+        existingCount: images.length,
+        newImage: { id: newImage.id, name: newImage.name },
+        totalCount: updatedImages.length,
+      });
       onImagesChange(updatedImages);
+      console.log(
+        "✅ Single image onImagesChange called with",
+        updatedImages.length,
+        "images"
+      );
 
       // Auto upload gambar ke server
-      await uploadImageToServer(newImage, updatedImages);
+      await uploadImageToServer(newImage);
     } catch (error) {
       console.error("Error handling selected image:", error);
       Alert.alert("Error", "Gagal memproses gambar yang dipilih");
@@ -516,11 +535,23 @@ const ImageUploadComponent = ({
 
       // Tambahkan semua gambar valid ke array
       const updatedImages = [...images, ...validImages];
+      console.log("📸 Adding images to state:", {
+        existingCount: images.length,
+        newImagesCount: validImages.length,
+        totalCount: updatedImages.length,
+        newImages: validImages.map((img) => ({ id: img.id, name: img.name })),
+      });
       onImagesChange(updatedImages);
+      console.log(
+        "✅ onImagesChange called with",
+        updatedImages.length,
+        "images"
+      );
 
       // Upload semua gambar ke server secara bersamaan (parallel)
+      // Each upload will get its own current state when it completes
       const uploadPromises = validImages.map((imageData) =>
-        uploadImageToServer(imageData, updatedImages)
+        uploadImageToServer(imageData)
       );
 
       // Tunggu semua upload selesai
@@ -538,16 +569,11 @@ const ImageUploadComponent = ({
   };
 
   // Fungsi untuk upload gambar ke server (Minio via Next.js API)
-  const uploadImageToServer = async (
-    imageData: ImageData,
-    currentImages: ImageData[]
-  ) => {
+  const uploadImageToServer = async (imageData: ImageData) => {
     try {
-      // Update status uploading
-      const updatedImages = currentImages.map((img) =>
-        img.id === imageData.id ? { ...img, uploading: true } : img
-      );
-      onImagesChange(updatedImages);
+      // Skip the uploading state update to avoid race conditions
+      // Just proceed directly to upload
+      console.log("� Starting upload for:", imageData.id);
 
       // Persiapan FormData untuk upload sesuai API documentation
       const formData = new FormData();
@@ -624,19 +650,60 @@ const ImageUploadComponent = ({
       console.log("✅ Upload response:", result);
 
       if (result.success) {
-        // Update status berhasil upload
-        const finalImages = currentImages.map((img) =>
-          img.id === imageData.id
-            ? {
-                ...img,
-                uploading: false,
-                uploaded: true,
-                minioPath: result.data.path,
-                minioFileName: result.data.fileName,
-              }
-            : img
-        );
-        onImagesChange(finalImages);
+        console.log("🔄 Updating upload status for:", imageData.id);
+
+        console.log("🔄 Updating upload status for:", imageData.id);
+
+        // The issue is we're using stale 'images' state. Let's force a state update
+        // by triggering a re-render that will get the fresh state.
+
+        // Create updated image data
+        const updatedImageData = {
+          ...imageData,
+          uploading: false,
+          uploaded: true,
+          minioPath: result.data.path,
+          minioFileName: result.data.fileName,
+        };
+
+        console.log("📝 Updating image in state:", {
+          id: updatedImageData.id,
+          name: updatedImageData.name,
+          uploaded: updatedImageData.uploaded,
+        });
+
+        // Use a callback approach by calling the parent's setUploadedImages directly
+        // Since we can't access the latest state here, we'll work around it
+        console.log("� About to call onImagesChange to update state");
+
+        // Use functional update to ensure we get the latest state
+        // This prevents race conditions when multiple uploads complete simultaneously
+        onImagesChange((prevImages: ImageData[]) => {
+          console.log(
+            "📋 Current images from functional update:",
+            prevImages.map((img: ImageData) => ({
+              id: img.id,
+              uploaded: img.uploaded,
+            }))
+          );
+
+          const finalImages = prevImages.map((img: ImageData) =>
+            img.id === imageData.id ? updatedImageData : img
+          );
+
+          console.log(
+            "🎯 Final images to set:",
+            finalImages.map((img: ImageData) => ({
+              id: img.id,
+              uploaded: img.uploaded,
+            }))
+          );
+
+          return finalImages;
+        });
+        console.log("✅ Upload success state updated");
+
+        console.log("✅ Upload state update process initiated");
         console.log("✅ Image uploaded successfully:", {
           fileName: result.data.fileName,
           path: result.data.path,
@@ -668,7 +735,8 @@ const ImageUploadComponent = ({
         );
       }
 
-      // Update status error
+      // Update status error using fresh images state from ref
+      const currentImages = imagesRef.current;
       const errorImages = currentImages.map((img) =>
         img.id === imageData.id
           ? {
@@ -678,6 +746,15 @@ const ImageUploadComponent = ({
               error: (error as Error).message || "Upload gagal",
             }
           : img
+      );
+      console.log(
+        "❌ Updated images after upload error:",
+        errorImages.map((img) => ({
+          id: img.id,
+          name: img.name,
+          uploaded: img.uploaded,
+          error: img.error,
+        }))
       );
       onImagesChange(errorImages);
 
@@ -693,24 +770,76 @@ const ImageUploadComponent = ({
   };
 
   // Fungsi untuk menghapus gambar
-  const deleteImage = async (imageId: string) => {
-    try {
-      const imageToDelete = images.find((img) => img.id === imageId);
+  const deleteImage = (imageId: string) => {
+    console.log("🔍 Starting delete process for imageId:", imageId);
+    console.log(
+      "📋 Current images array before deletion:",
+      images.map((img) => ({
+        id: img.id,
+        name: img.name,
+        uploaded: img.uploaded,
+        uploading: img.uploading,
+        hasMinioPath: !!img.minioPath,
+      }))
+    );
 
-      if (!imageToDelete) return;
+    const imageToDelete = images.find((img) => img.id === imageId);
 
-      // Jika gambar sudah diupload ke server, hapus dari server juga
-      if (imageToDelete.uploaded && imageToDelete.minioPath) {
-        await deleteImageFromServer(imageToDelete.minioPath);
-      }
-
-      // Hapus dari array lokal
-      const updatedImages = images.filter((img) => img.id !== imageId);
-      onImagesChange(updatedImages);
-    } catch (error) {
-      console.error("Error deleting image:", error);
-      Alert.alert("Error", "Gagal menghapus gambar");
+    if (!imageToDelete) {
+      console.warn("⚠️ Image not found in array for deletion:", imageId);
+      Alert.alert("Error", "Gambar tidak ditemukan dalam daftar");
+      return;
     }
+
+    console.log("🎯 Found image to delete:", {
+      id: imageToDelete.id,
+      name: imageToDelete.name,
+      uploaded: imageToDelete.uploaded,
+      uploading: imageToDelete.uploading,
+      error: imageToDelete.error,
+      minioPath: imageToDelete.minioPath,
+    });
+
+    // Create new array without the deleted image
+    const updatedImages = images.filter((img) => img.id !== imageId);
+    console.log(
+      "📝 Images after filtering:",
+      updatedImages.map((img) => ({ id: img.id, name: img.name }))
+    );
+    console.log(
+      "� Array length change:",
+      images.length,
+      "->",
+      updatedImages.length
+    );
+
+    // Update the state immediately
+    onImagesChange(updatedImages);
+    console.log(
+      "✅ onImagesChange called with",
+      updatedImages.length,
+      "images"
+    );
+
+    // Handle server deletion for uploaded images
+    if (imageToDelete.uploaded && imageToDelete.minioPath) {
+      console.log(
+        "🌐 Starting async server deletion for:",
+        imageToDelete.minioPath
+      );
+      deleteImageFromServer(imageToDelete.minioPath).catch((error) => {
+        console.error("❌ Async server deletion failed:", error);
+      });
+    } else {
+      console.log(
+        "⏭️ Skipping server deletion - uploaded:",
+        imageToDelete.uploaded,
+        "hasPath:",
+        !!imageToDelete.minioPath
+      );
+    }
+
+    console.log("🎉 Delete process completed for:", imageToDelete.name);
   };
 
   // Fungsi untuk menghapus gambar dari server
@@ -720,6 +849,7 @@ const ImageUploadComponent = ({
         process.env.EXPO_PUBLIC_API_BASE_URL || "http://localhost:3000";
 
       console.log("🗑️ Deleting image from server:", filePath);
+      console.log("🌐 API URL:", `${API_BASE_URL}/api/delete-image`);
 
       const response = await fetch(`${API_BASE_URL}/api/delete-image`, {
         method: "DELETE",
@@ -732,20 +862,55 @@ const ImageUploadComponent = ({
         }),
       });
 
+      console.log("📡 Delete response status:", response.status);
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error("❌ Delete request failed:", errorText);
+        throw new Error(
+          `Delete failed with status: ${response.status} - ${errorText}`
+        );
+      }
+
       const result = await response.json();
+      console.log("📋 Delete response body:", result);
 
       if (result.success) {
         console.log("✅ Image deleted successfully from server");
       } else {
-        console.warn("❌ Failed to delete image from server:", result.message);
+        console.warn("❌ Server reported delete failure:", result.message);
+        // Don't throw error here - just log warning so local deletion still works
       }
     } catch (error) {
       console.error("❌ Error deleting image from server:", error);
+      console.error(
+        "⚠️ Server deletion failed, but continuing with local deletion"
+      );
+      // Don't re-throw the error to avoid blocking local deletion
     }
   };
 
   // Fungsi untuk konfirmasi hapus gambar
   const confirmDeleteImage = (imageId: string, imageName: string) => {
+    console.log("🔄 Confirm delete called for:", { imageId, imageName });
+    console.log(
+      "🔍 Current images in confirmDelete:",
+      images.map((img) => ({
+        id: img.id,
+        name: img.name,
+        uploaded: img.uploaded,
+      }))
+    );
+
+    // Check if image still exists before showing confirmation
+    const imageExists = images.find((img) => img.id === imageId);
+    if (!imageExists) {
+      console.warn("⚠️ Image already deleted or not found:", imageId);
+      return;
+    }
+
+    console.log("✅ Image found, showing confirmation dialog");
+
     Alert.alert(
       "Hapus Gambar",
       `Apakah Anda yakin ingin menghapus ${imageName}?`,
@@ -754,51 +919,85 @@ const ImageUploadComponent = ({
         {
           text: "Hapus",
           style: "destructive",
-          onPress: () => deleteImage(imageId),
+          onPress: () => {
+            console.log("👆 User confirmed deletion for:", imageId);
+            // Double-check image still exists when user confirms
+            const stillExists = images.find((img) => img.id === imageId);
+            if (stillExists) {
+              console.log("🚀 Proceeding with deletion...");
+              deleteImage(imageId);
+            } else {
+              console.warn(
+                "⚠️ Image was already deleted while confirmation was shown"
+              );
+            }
+          },
         },
       ]
     );
   };
 
   // Render item gambar dalam list
-  const renderImageItem = ({ item }: { item: ImageData }) => (
-    <View style={styles.imageContainer}>
-      <Image source={{ uri: item.uri }} style={styles.imagePreview} />
+  const renderImageItem = ({ item }: { item: ImageData }) => {
+    console.log("🖼️ Rendering image item:", {
+      id: item.id,
+      name: item.name,
+      uploaded: item.uploaded,
+      uploading: item.uploading,
+      hasUri: !!item.uri,
+      uriStart: item.uri.substring(0, 30),
+    });
 
-      {/* Overlay untuk status upload */}
-      {(item.uploading || item.error) && (
-        <View style={styles.imageOverlay}>
-          {item.uploading && (
-            <>
-              <ActivityIndicator size="small" color="#fff" />
-              <Text style={styles.uploadingText}>Uploading...</Text>
-            </>
-          )}
-          {item.error && <Text style={styles.errorText}>❌ {item.error}</Text>}
-        </View>
-      )}
+    return (
+      <View style={styles.imageContainer}>
+        <Image source={{ uri: item.uri }} style={styles.imagePreview} />
 
-      {/* Indikator berhasil upload */}
-      {item.uploaded && !item.uploading && !item.error && (
-        <View style={styles.successIndicator}>
-          <Text style={styles.successText}>✓</Text>
-        </View>
-      )}
+        {/* Overlay untuk status upload */}
+        {(item.uploading || item.error) && (
+          <View style={styles.imageOverlay}>
+            {item.uploading && (
+              <>
+                <ActivityIndicator size="small" color="#fff" />
+                <Text style={styles.uploadingText}>Uploading...</Text>
+              </>
+            )}
+            {item.error && (
+              <Text style={styles.errorText}>❌ {item.error}</Text>
+            )}
+          </View>
+        )}
 
-      {/* Tombol hapus */}
-      <TouchableOpacity
-        style={styles.deleteButton}
-        onPress={() => confirmDeleteImage(item.id, item.name)}
-      >
-        <Text style={styles.deleteButtonText}>×</Text>
-      </TouchableOpacity>
+        {/* Indikator berhasil upload */}
+        {item.uploaded && !item.uploading && !item.error && (
+          <View style={styles.successIndicator}>
+            <Text style={styles.successText}>✓</Text>
+          </View>
+        )}
 
-      {/* Info ukuran file */}
-      <Text style={styles.imageSizeText}>
-        {(item.size / (1024 * 1024)).toFixed(1)} MB
-      </Text>
-    </View>
-  );
+        {/* Tombol hapus */}
+        <TouchableOpacity
+          style={styles.deleteButton}
+          onPress={() => {
+            console.log("🔴 Delete button pressed for:", {
+              id: item.id,
+              name: item.name,
+              uploaded: item.uploaded,
+              uploading: item.uploading,
+              error: item.error,
+            });
+            confirmDeleteImage(item.id, item.name);
+          }}
+        >
+          <Text style={styles.deleteButtonText}>×</Text>
+        </TouchableOpacity>
+
+        {/* Info ukuran file */}
+        <Text style={styles.imageSizeText}>
+          {(item.size / (1024 * 1024)).toFixed(1)} MB
+        </Text>
+      </View>
+    );
+  };
 
   return (
     <View style={styles.imageUploadContainer}>
@@ -829,15 +1028,26 @@ const ImageUploadComponent = ({
 
       {/* List gambar yang sudah dipilih */}
       {images.length > 0 && (
-        <FlatList
-          data={images}
-          renderItem={renderImageItem}
-          keyExtractor={(item) => item.id}
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          style={styles.imagesList}
-          contentContainerStyle={styles.imagesListContent}
-        />
+        <>
+          {console.log(
+            "🎨 Rendering FlatList with images:",
+            images.map((img) => ({
+              id: img.id,
+              name: img.name,
+              uploaded: img.uploaded,
+              hasUri: !!img.uri,
+            }))
+          )}
+          <FlatList
+            data={images}
+            renderItem={renderImageItem}
+            keyExtractor={(item) => item.id}
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            style={styles.imagesList}
+            contentContainerStyle={styles.imagesListContent}
+          />
+        </>
       )}
 
       {/* Info status upload */}
@@ -873,6 +1083,60 @@ export default function CreateTaskScreen() {
 
   // State untuk mengelola gambar yang diupload
   const [uploadedImages, setUploadedImages] = useState<ImageData[]>([]);
+
+  // Wrap setUploadedImages to debug what's setting it and support functional updates
+  const debugSetUploadedImages = (
+    newImagesOrUpdater: ImageData[] | ((prev: ImageData[]) => ImageData[])
+  ) => {
+    if (typeof newImagesOrUpdater === "function") {
+      // Functional update - get current state and apply the function
+      setUploadedImages((prevImages) => {
+        const newImages = newImagesOrUpdater(prevImages);
+        console.log("🔧 setUploadedImages called with functional update:", {
+          count: newImages.length,
+          images: newImages.map((img) => ({ id: img.id, name: img.name })),
+        });
+        if (newImages.length === 0) {
+          console.log("⚠️ SETTING TO EMPTY ARRAY! Stack trace:");
+          const error = new Error("Empty array set");
+          console.error("Stack trace:", error.stack);
+        }
+        return newImages;
+      });
+    } else {
+      // Direct array update
+      const newImages = newImagesOrUpdater;
+      console.log("🔧 setUploadedImages called with:", {
+        count: newImages.length,
+        images: newImages.map((img) => ({ id: img.id, name: img.name })),
+      });
+      if (newImages.length === 0) {
+        console.log("⚠️ SETTING TO EMPTY ARRAY! Stack trace:");
+        const error = new Error("Empty array set");
+        console.error("Stack trace:", error.stack);
+      }
+      setUploadedImages(newImages);
+    }
+  };
+
+  // Debug uploaded images state changes
+  useEffect(() => {
+    console.log("🔄 uploadedImages state changed:", {
+      count: uploadedImages.length,
+      images: uploadedImages.map((img) => ({
+        id: img.id,
+        name: img.name,
+        uploaded: img.uploaded,
+        uploading: img.uploading,
+      })),
+    });
+
+    // Log the stack trace to see what's causing the state change
+    if (uploadedImages.length === 0) {
+      console.log("⚠️ State reset to empty! Stack trace:");
+      console.trace();
+    }
+  }, [uploadedImages]);
 
   // Get today's date in YYYY-MM-DD format
   const getTodayDate = () => {
@@ -1345,7 +1609,7 @@ export default function CreateTaskScreen() {
             <View style={styles.formGroup}>
               <ImageUploadComponent
                 images={uploadedImages}
-                onImagesChange={setUploadedImages}
+                onImagesChange={debugSetUploadedImages}
                 maxImages={5}
                 maxSize={5 * 1024 * 1024} // 5MB
               />
