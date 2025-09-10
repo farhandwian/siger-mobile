@@ -33,6 +33,13 @@
           "resizeMode": "contain",
           "backgroundColor": "#ffffff"
         }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Aplikasi memerlukan akses foto untuk upload gambar dokumentasi kegiatan harian.",
+          "cameraPermission": "Aplikasi memerlukan akses kamera untuk mengambil foto dokumentasi kegiatan."
+        }
       ]
     ],
     "experiments": {

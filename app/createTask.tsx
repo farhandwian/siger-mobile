@@ -15,6 +15,9 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+// Import packages untuk image picker dan file system
+import * as FileSystem from "expo-file-system";
+import * as ImagePicker from "expo-image-picker";
 
 // Custom Dropdown Component
 const CustomDropdown = ({
@@ -204,6 +207,518 @@ const CustomDropdown = ({
   );
 };
 
+// Interface untuk data gambar yang akan diupload
+interface ImageData {
+  id: string;
+  uri: string;
+  name: string;
+  type: string;
+  size: number;
+  uploading?: boolean;
+  uploaded?: boolean;
+  error?: string;
+  minioPath?: string; // Path file di Minio setelah diupload
+  minioFileName?: string; // Nama file di Minio
+}
+
+// Komponen untuk upload dan preview gambar
+const ImageUploadComponent = ({
+  images,
+  onImagesChange,
+  maxImages = 5,
+  maxSize = 5 * 1024 * 1024, // 5MB default
+}: {
+  images: ImageData[];
+  onImagesChange: (images: ImageData[]) => void;
+  maxImages?: number;
+  maxSize?: number;
+}) => {
+  // Fungsi untuk meminta permission kamera dan galeri
+  const requestPermissions = async () => {
+    try {
+      // Request permission untuk kamera
+      const cameraPermission =
+        await ImagePicker.requestCameraPermissionsAsync();
+      // Request permission untuk media library
+      const mediaPermission =
+        await ImagePicker.requestMediaLibraryPermissionsAsync();
+
+      return cameraPermission.granted && mediaPermission.granted;
+    } catch (error) {
+      console.error("Error requesting permissions:", error);
+      return false;
+    }
+  };
+
+  // Fungsi untuk menampilkan pilihan sumber gambar (kamera atau galeri)
+  const showImageSourceOptions = () => {
+    const remainingSlots = maxImages - images.length;
+
+    Alert.alert(
+      "Pilih Sumber Gambar",
+      `Anda bisa menambah ${remainingSlots} gambar lagi\n\n• Kamera: Ambil 1 foto\n• Galeri: Pilih beberapa foto sekaligus`,
+      [
+        {
+          text: "📷 Kamera",
+          onPress: () => pickImageFromCamera(),
+        },
+        {
+          text: "🖼️ Galeri (Multiple)",
+          onPress: () => pickImageFromGallery(),
+        },
+        {
+          text: "Batal",
+          style: "cancel",
+        },
+      ]
+    );
+  };
+
+  // Fungsi untuk mengambil gambar dari kamera
+  const pickImageFromCamera = async () => {
+    try {
+      const hasPermissions = await requestPermissions();
+      if (!hasPermissions) {
+        Alert.alert("Error", "Permission kamera dan galeri diperlukan");
+        return;
+      }
+
+      const result = await ImagePicker.launchCameraAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: false, // Tidak wajib crop, biar gambar full
+        quality: 0.8, // Kompresi gambar untuk mengurangi ukuran file
+      });
+
+      if (!result.canceled && result.assets[0]) {
+        await handleImageSelected(result.assets[0]);
+      }
+    } catch (error) {
+      console.error("Error picking image from camera:", error);
+      Alert.alert("Error", "Gagal mengambil gambar dari kamera");
+    }
+  };
+
+  // Fungsi untuk mengambil gambar dari galeri (multiple selection)
+  const pickImageFromGallery = async () => {
+    try {
+      const hasPermissions = await requestPermissions();
+      if (!hasPermissions) {
+        Alert.alert("Error", "Permission galeri diperlukan");
+        return;
+      }
+
+      // Hitung berapa gambar yang masih bisa dipilih
+      const remainingSlots = maxImages - images.length;
+
+      if (remainingSlots <= 0) {
+        Alert.alert(
+          "Error",
+          `Maksimal ${maxImages} gambar yang dapat diupload`
+        );
+        return;
+      }
+
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: false, // Tidak wajib crop, biar gambar full
+        quality: 0.8, // Kompresi gambar untuk mengurangi ukuran file
+        allowsMultipleSelection: true, // Enable multiple selection
+        selectionLimit: remainingSlots, // Batasi sesuai slot yang tersisa
+      });
+
+      if (!result.canceled && result.assets && result.assets.length > 0) {
+        // Process multiple images yang dipilih
+        await handleMultipleImagesSelected(result.assets);
+      }
+    } catch (error) {
+      console.error("Error picking image from gallery:", error);
+      Alert.alert("Error", "Gagal mengambil gambar dari galeri");
+    }
+  };
+
+  // Fungsi untuk memproses gambar yang dipilih (single image)
+  const handleImageSelected = async (asset: ImagePicker.ImagePickerAsset) => {
+    try {
+      // Cek apakah sudah mencapai batas maksimal gambar
+      if (images.length >= maxImages) {
+        Alert.alert(
+          "Error",
+          `Maksimal ${maxImages} gambar yang dapat diupload`
+        );
+        return;
+      }
+
+      // Dapatkan informasi file
+      const fileInfo = await FileSystem.getInfoAsync(asset.uri);
+
+      // Cek ukuran file (fileInfo memiliki property size jika file exists)
+      if (fileInfo.exists && "size" in fileInfo && fileInfo.size > maxSize) {
+        const sizeMB = (maxSize / (1024 * 1024)).toFixed(1);
+        Alert.alert(
+          "Error",
+          `Ukuran gambar tidak boleh lebih dari ${sizeMB}MB`
+        );
+        return;
+      }
+
+      // Generate unique ID untuk gambar
+      const imageId = `img_${Date.now()}_${Math.random()
+        .toString(36)
+        .substr(2, 9)}`;
+
+      // Buat object ImageData
+      const newImage: ImageData = {
+        id: imageId,
+        uri: asset.uri,
+        name: asset.fileName || `image_${imageId}.jpg`,
+        type: asset.type || "image/jpeg",
+        size: fileInfo.exists && "size" in fileInfo ? fileInfo.size : 0,
+        uploading: false,
+        uploaded: false,
+      };
+
+      // Tambahkan gambar ke array
+      const updatedImages = [...images, newImage];
+      onImagesChange(updatedImages);
+
+      // Auto upload gambar ke server
+      await uploadImageToServer(newImage, updatedImages);
+    } catch (error) {
+      console.error("Error handling selected image:", error);
+      Alert.alert("Error", "Gagal memproses gambar yang dipilih");
+    }
+  };
+
+  // Fungsi untuk memproses multiple gambar yang dipilih dari galeri
+  const handleMultipleImagesSelected = async (
+    assets: ImagePicker.ImagePickerAsset[]
+  ) => {
+    try {
+      const validImages: ImageData[] = [];
+      const oversizedImages: string[] = [];
+
+      // Validate semua gambar terlebih dahulu
+      for (const asset of assets) {
+        // Cek apakah masih ada slot untuk gambar baru
+        if (images.length + validImages.length >= maxImages) {
+          Alert.alert(
+            "Info",
+            `Hanya ${maxImages - images.length} gambar yang bisa ditambahkan`
+          );
+          break;
+        }
+
+        // Dapatkan informasi file
+        const fileInfo = await FileSystem.getInfoAsync(asset.uri);
+
+        // Cek ukuran file
+        if (fileInfo.exists && "size" in fileInfo && fileInfo.size > maxSize) {
+          const fileName = asset.fileName || "Unknown file";
+          oversizedImages.push(fileName);
+          continue; // Skip file ini, lanjut ke file berikutnya
+        }
+
+        // Generate unique ID untuk gambar
+        const imageId = `img_${Date.now()}_${Math.random()
+          .toString(36)
+          .substr(2, 9)}_${validImages.length}`;
+
+        // Buat object ImageData
+        const newImage: ImageData = {
+          id: imageId,
+          uri: asset.uri,
+          name: asset.fileName || `image_${imageId}.jpg`,
+          type: asset.type || "image/jpeg",
+          size: fileInfo.exists && "size" in fileInfo ? fileInfo.size : 0,
+          uploading: false,
+          uploaded: false,
+        };
+
+        validImages.push(newImage);
+      }
+
+      // Tampilkan peringatan untuk file yang terlalu besar
+      if (oversizedImages.length > 0) {
+        const sizeMB = (maxSize / (1024 * 1024)).toFixed(1);
+        Alert.alert(
+          "Beberapa gambar tidak dapat diupload",
+          `File berikut melebihi ${sizeMB}MB:\n${oversizedImages.join("\n")}`
+        );
+      }
+
+      // Jika tidak ada gambar valid, keluar
+      if (validImages.length === 0) {
+        if (oversizedImages.length > 0) {
+          return; // Error message sudah ditampilkan di atas
+        }
+        Alert.alert("Error", "Tidak ada gambar yang valid untuk diupload");
+        return;
+      }
+
+      // Tambahkan semua gambar valid ke array
+      const updatedImages = [...images, ...validImages];
+      onImagesChange(updatedImages);
+
+      // Upload semua gambar ke server secara bersamaan (parallel)
+      const uploadPromises = validImages.map((imageData) =>
+        uploadImageToServer(imageData, updatedImages)
+      );
+
+      // Tunggu semua upload selesai
+      await Promise.allSettled(uploadPromises);
+
+      // Tampilkan notifikasi berhasil
+      Alert.alert(
+        "Berhasil",
+        `${validImages.length} gambar berhasil ditambahkan`
+      );
+    } catch (error) {
+      console.error("Error handling multiple selected images:", error);
+      Alert.alert("Error", "Gagal memproses gambar yang dipilih");
+    }
+  };
+
+  // Fungsi untuk upload gambar ke server (Minio via Next.js API)
+  const uploadImageToServer = async (
+    imageData: ImageData,
+    currentImages: ImageData[]
+  ) => {
+    try {
+      // Update status uploading
+      const updatedImages = currentImages.map((img) =>
+        img.id === imageData.id ? { ...img, uploading: true } : img
+      );
+      onImagesChange(updatedImages);
+
+      // Persiapan FormData untuk upload
+      const formData = new FormData();
+
+      // Tambahkan file ke FormData
+      formData.append("file", {
+        uri: imageData.uri,
+        type: imageData.type,
+        name: imageData.name,
+      } as any);
+
+      // Tambahkan metadata
+      formData.append("bucket", "siger");
+      formData.append("folder", "dokumentasi-harian");
+      formData.append("originalName", imageData.name);
+
+      // Get API base URL
+      const API_BASE_URL =
+        process.env.EXPO_PUBLIC_API_BASE_URL || "http://localhost:3000";
+
+      // Upload ke server
+      const response = await fetch(`${API_BASE_URL}/api/upload-image`, {
+        method: "POST",
+        body: formData,
+        headers: {
+          "Content-Type": "multipart/form-data",
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error(`Upload failed with status: ${response.status}`);
+      }
+
+      const result = await response.json();
+
+      if (result.success) {
+        // Update status berhasil upload
+        const finalImages = currentImages.map((img) =>
+          img.id === imageData.id
+            ? {
+                ...img,
+                uploading: false,
+                uploaded: true,
+                minioPath: result.data.path,
+                minioFileName: result.data.fileName,
+              }
+            : img
+        );
+        onImagesChange(finalImages);
+        console.log("Image uploaded successfully:", result.data);
+      } else {
+        throw new Error(result.message || "Upload failed");
+      }
+    } catch (error) {
+      console.error("Error uploading image:", error);
+
+      // Update status error
+      const errorImages = currentImages.map((img) =>
+        img.id === imageData.id
+          ? {
+              ...img,
+              uploading: false,
+              uploaded: false,
+              error: (error as Error).message || "Upload gagal",
+            }
+          : img
+      );
+      onImagesChange(errorImages);
+
+      Alert.alert("Error Upload", "Gagal mengupload gambar. Coba lagi nanti.");
+    }
+  };
+
+  // Fungsi untuk menghapus gambar
+  const deleteImage = async (imageId: string) => {
+    try {
+      const imageToDelete = images.find((img) => img.id === imageId);
+
+      if (!imageToDelete) return;
+
+      // Jika gambar sudah diupload ke server, hapus dari server juga
+      if (imageToDelete.uploaded && imageToDelete.minioFileName) {
+        await deleteImageFromServer(imageToDelete.minioFileName);
+      }
+
+      // Hapus dari array lokal
+      const updatedImages = images.filter((img) => img.id !== imageId);
+      onImagesChange(updatedImages);
+    } catch (error) {
+      console.error("Error deleting image:", error);
+      Alert.alert("Error", "Gagal menghapus gambar");
+    }
+  };
+
+  // Fungsi untuk menghapus gambar dari server
+  const deleteImageFromServer = async (fileName: string) => {
+    try {
+      const API_BASE_URL =
+        process.env.EXPO_PUBLIC_API_BASE_URL || "http://localhost:3000";
+
+      const response = await fetch(`${API_BASE_URL}/api/delete-image`, {
+        method: "DELETE",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          bucket: "siger",
+          fileName: fileName,
+        }),
+      });
+
+      const result = await response.json();
+
+      if (!result.success) {
+        console.warn("Failed to delete image from server:", result.message);
+      }
+    } catch (error) {
+      console.error("Error deleting image from server:", error);
+    }
+  };
+
+  // Fungsi untuk konfirmasi hapus gambar
+  const confirmDeleteImage = (imageId: string, imageName: string) => {
+    Alert.alert(
+      "Hapus Gambar",
+      `Apakah Anda yakin ingin menghapus ${imageName}?`,
+      [
+        { text: "Batal", style: "cancel" },
+        {
+          text: "Hapus",
+          style: "destructive",
+          onPress: () => deleteImage(imageId),
+        },
+      ]
+    );
+  };
+
+  // Render item gambar dalam list
+  const renderImageItem = ({ item }: { item: ImageData }) => (
+    <View style={styles.imageContainer}>
+      <Image source={{ uri: item.uri }} style={styles.imagePreview} />
+
+      {/* Overlay untuk status upload */}
+      {(item.uploading || item.error) && (
+        <View style={styles.imageOverlay}>
+          {item.uploading && (
+            <>
+              <ActivityIndicator size="small" color="#fff" />
+              <Text style={styles.uploadingText}>Uploading...</Text>
+            </>
+          )}
+          {item.error && <Text style={styles.errorText}>❌ {item.error}</Text>}
+        </View>
+      )}
+
+      {/* Indikator berhasil upload */}
+      {item.uploaded && !item.uploading && !item.error && (
+        <View style={styles.successIndicator}>
+          <Text style={styles.successText}>✓</Text>
+        </View>
+      )}
+
+      {/* Tombol hapus */}
+      <TouchableOpacity
+        style={styles.deleteButton}
+        onPress={() => confirmDeleteImage(item.id, item.name)}
+      >
+        <Text style={styles.deleteButtonText}>×</Text>
+      </TouchableOpacity>
+
+      {/* Info ukuran file */}
+      <Text style={styles.imageSizeText}>
+        {(item.size / (1024 * 1024)).toFixed(1)} MB
+      </Text>
+    </View>
+  );
+
+  return (
+    <View style={styles.imageUploadContainer}>
+      {/* Header dengan info */}
+      <View style={styles.imageUploadHeader}>
+        <Text style={styles.imageUploadTitle}>
+          Gambar Kegiatan ({images.length}/{maxImages})
+        </Text>
+        <Text style={styles.imageUploadSubtitle}>
+          Max {(maxSize / (1024 * 1024)).toFixed(0)}MB per gambar
+        </Text>
+      </View>
+
+      {/* Tombol tambah gambar */}
+      {images.length < maxImages && (
+        <TouchableOpacity
+          style={styles.addImageButton}
+          onPress={showImageSourceOptions}
+        >
+          <Text style={styles.addImageButtonText}>
+            📷 Tambah Gambar ({maxImages - images.length} slot tersisa)
+          </Text>
+          <Text style={styles.addImageSubText}>
+            Kamera: 1 foto • Galeri: Multiple foto
+          </Text>
+        </TouchableOpacity>
+      )}
+
+      {/* List gambar yang sudah dipilih */}
+      {images.length > 0 && (
+        <FlatList
+          data={images}
+          renderItem={renderImageItem}
+          keyExtractor={(item) => item.id}
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          style={styles.imagesList}
+          contentContainerStyle={styles.imagesListContent}
+        />
+      )}
+
+      {/* Info status upload */}
+      {images.length > 0 && (
+        <View style={styles.uploadStatusContainer}>
+          <Text style={styles.uploadStatusText}>
+            {images.filter((img) => img.uploaded).length} dari {images.length}{" "}
+            gambar berhasil diupload
+          </Text>
+        </View>
+      )}
+    </View>
+  );
+};
+
 export default function CreateTaskScreen() {
   const router = useRouter();
 
@@ -221,6 +736,9 @@ export default function CreateTaskScreen() {
     "Telah dilaksanakan mobilisasi untuk persiapan awal proyek. Kegiatan meliputi pembersihan lokasi dan pengiriman material tahap pertama."
   );
   const [koordinat, setKoordinat] = useState("");
+
+  // State untuk mengelola gambar yang diupload
+  const [uploadedImages, setUploadedImages] = useState<ImageData[]>([]);
 
   // Get today's date in YYYY-MM-DD format
   const getTodayDate = () => {
@@ -500,6 +1018,14 @@ export default function CreateTaskScreen() {
       const API_BASE_URL =
         process.env.EXPO_PUBLIC_API_BASE_URL || "http://localhost:3000";
 
+      // Siapkan data files dari gambar yang sudah diupload
+      const uploadedFiles = uploadedImages
+        .filter((img) => img.uploaded && img.minioFileName && img.minioPath)
+        .map((img) => ({
+          file: img.minioFileName!,
+          path: img.minioPath!,
+        }));
+
       // Prepare payload according to API specification
       const payload = {
         user_id: "cmfb8i5yo0000vpgc5p776720",
@@ -511,20 +1037,7 @@ export default function CreateTaskScreen() {
           longitude: 106.8456,
         },
         catatan_kegiatan: catatan.trim(),
-        files: [
-          {
-            file: "progress_photo_1.jpg",
-            path: "/upload/progress/progress_photo_1.jpg",
-          },
-          {
-            file: "progress_photo_2.jpg",
-            path: "/upload/progress/progress_photo_2.jpg",
-          },
-          {
-            file: "progress_photo_3.jpg",
-            path: "/upload/progress/progress_photo_3.jpg",
-          },
-        ],
+        files: uploadedFiles, // Gunakan files yang sudah diupload
       };
 
       console.log("Submitting daily progress:", payload);
@@ -570,7 +1083,7 @@ export default function CreateTaskScreen() {
     return (
       <View style={styles.container}>
         <View style={styles.topbar}>
-          <TouchableOpacity 
+          <TouchableOpacity
             style={styles.backButton}
             onPress={() => router.back()}
           >
@@ -591,7 +1104,7 @@ export default function CreateTaskScreen() {
     <View style={styles.container}>
       {/* Topbar */}
       <View style={styles.topbar}>
-        <TouchableOpacity 
+        <TouchableOpacity
           style={styles.backButton}
           onPress={() => router.back()}
         >
@@ -694,30 +1207,14 @@ export default function CreateTaskScreen() {
                 placeholder="Cari lokasi..."
               />
             </View>
-            {/* Gambar */}
+            {/* Komponen Upload Gambar */}
             <View style={styles.formGroup}>
-              <Text style={styles.label}>Gambar Kegiatan (Max 5MB)</Text>
-              <View style={{ flexDirection: "row", gap: 8 }}>
-                {/* Dummy images, not implemented */}
-                <Image
-                  source={{
-                    uri: "http://localhost:3845/assets/c57d67378967725d8500d8cd523b2f0609b154c6.png",
-                  }}
-                  style={styles.image}
-                />
-                <Image
-                  source={{
-                    uri: "http://localhost:3845/assets/e4d02ee6b1dc9201958b964e051d9d005551646e.png",
-                  }}
-                  style={styles.image}
-                />
-                <Image
-                  source={{
-                    uri: "http://localhost:3845/assets/92058e5232f967d7349f4c6e700e0499f4f2da49.png",
-                  }}
-                  style={styles.image}
-                />
-              </View>
+              <ImageUploadComponent
+                images={uploadedImages}
+                onImagesChange={setUploadedImages}
+                maxImages={5}
+                maxSize={5 * 1024 * 1024} // 5MB
+              />
             </View>
 
             <TouchableOpacity
@@ -953,5 +1450,143 @@ const styles = StyleSheet.create({
     color: "#fff",
     fontSize: 14,
     fontWeight: "500",
+  },
+  // Styles untuk komponen upload gambar
+  imageUploadContainer: {
+    marginVertical: 8,
+  },
+  imageUploadHeader: {
+    marginBottom: 12,
+  },
+  imageUploadTitle: {
+    fontSize: 14,
+    color: "#101828",
+    fontWeight: "600",
+    marginBottom: 4,
+  },
+  imageUploadSubtitle: {
+    fontSize: 12,
+    color: "#6b7280",
+  },
+  addImageButton: {
+    backgroundColor: "#f3f4f6",
+    borderColor: "#d1d5db",
+    borderWidth: 2,
+    borderStyle: "dashed",
+    borderRadius: 8,
+    paddingVertical: 20,
+    paddingHorizontal: 16,
+    alignItems: "center",
+    marginBottom: 12,
+  },
+  addImageButtonText: {
+    color: "#6b7280",
+    fontSize: 14,
+    fontWeight: "500",
+    marginBottom: 4,
+  },
+  addImageSubText: {
+    color: "#9ca3af",
+    fontSize: 12,
+    textAlign: "center",
+  },
+  imagesList: {
+    marginVertical: 8,
+  },
+  imagesListContent: {
+    paddingRight: 16,
+  },
+  imageContainer: {
+    position: "relative",
+    marginRight: 12,
+    borderRadius: 8,
+    overflow: "hidden",
+  },
+  imagePreview: {
+    width: 80,
+    height: 80,
+    borderRadius: 8,
+    backgroundColor: "#f3f4f6",
+  },
+  imageOverlay: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: "rgba(0, 0, 0, 0.7)",
+    justifyContent: "center",
+    alignItems: "center",
+    borderRadius: 8,
+  },
+  uploadingText: {
+    color: "#fff",
+    fontSize: 10,
+    marginTop: 4,
+    textAlign: "center",
+  },
+  errorText: {
+    color: "#fff",
+    fontSize: 10,
+    textAlign: "center",
+    paddingHorizontal: 4,
+  },
+  successIndicator: {
+    position: "absolute",
+    top: 4,
+    right: 4,
+    backgroundColor: "#10b981",
+    borderRadius: 10,
+    width: 20,
+    height: 20,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  successText: {
+    color: "#fff",
+    fontSize: 12,
+    fontWeight: "bold",
+  },
+  deleteButton: {
+    position: "absolute",
+    top: 4,
+    left: 4,
+    backgroundColor: "#ef4444",
+    borderRadius: 10,
+    width: 20,
+    height: 20,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  deleteButtonText: {
+    color: "#fff",
+    fontSize: 14,
+    fontWeight: "bold",
+    lineHeight: 16,
+  },
+  imageSizeText: {
+    position: "absolute",
+    bottom: 2,
+    left: 2,
+    right: 2,
+    backgroundColor: "rgba(0, 0, 0, 0.7)",
+    color: "#fff",
+    fontSize: 8,
+    textAlign: "center",
+    paddingVertical: 1,
+    borderBottomLeftRadius: 8,
+    borderBottomRightRadius: 8,
+  },
+  uploadStatusContainer: {
+    backgroundColor: "#f0f9ff",
+    borderRadius: 6,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    marginTop: 8,
+  },
+  uploadStatusText: {
+    fontSize: 12,
+    color: "#0369a1",
+    textAlign: "center",
   },
 });

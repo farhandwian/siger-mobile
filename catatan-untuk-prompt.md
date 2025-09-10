@@ -231,10 +231,13 @@ tolonng buatkan ui untuk menampilkan list daily sub activities, dimana akan ada 
 
 
 ------------------------------------
-tolong tambahkan input untuk menyimpan gambar, user bisa melihat preview gambar tersebut dan juga bisa menghapus gambar tesrebut, lalu nantinya gambar tersebut akan disimpan di minio, minio akan mengembalikan link dan pathnya, lalu link dan path tersebut akan disimpan pada db.
+tolong tambahkan input fied untuk mengupload gamba. user bisa mengupload gambar, melihat preview gambar yang sudah dimasukkan dan juga bisa menghapus gambar tesrebut. lalu ketika mengupdate, pada input field tersebut bisa me-load image-imagenya. 
 
-1.buat api upload file, delete file, 
+gambar tersebut akan disimpan di minio, lalu data dari minio(nama filenya dan pathnya) tersebut lah yang akan disimpan kedalam db lewat payload key files dalam api daily-sub-activities-update. api be nya itu menggunakan next js. jadi tolong anda buatkan komponennya, dan jika pada kodenya perlu menghit api next js untuk mengupload, mendelete, dan mendownload filenya, tolong integrasikan saja dulu dan berikan juga dokumentasinya yang lengkap nanti saya akan buatkan apinya.
 
+pada minionya saya sudah membuat bucker bernama siger, dengan folder dokumentasi-harian. saya ingin memasukan gambarnya kesana.
+
+tolong juga berikan penjelsan pada kodenya supaya saya mudah memahami kodenya.
 
 ------------------------
 ternyata setiap merfersesh data dibawahnya, datanya itu pasti kembali ke salah satu data dengan progres 9.96. jika terlalu suilit ubah pendekatan nya anda bisa menggunaakan ini @shopify/flash-list, dengan referensi kode ini:
