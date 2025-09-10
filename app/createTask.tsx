@@ -284,7 +284,7 @@ const ImageUploadComponent = ({
       }
 
       const result = await ImagePicker.launchCameraAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        mediaTypes: ImagePicker.MediaTypeOptions.Images, // Skip deprecated warning for now
         allowsEditing: false, // Tidak wajib crop, biar gambar full
         quality: 0.8, // Kompresi gambar untuk mengurangi ukuran file
       });
@@ -366,12 +366,41 @@ const ImageUploadComponent = ({
         .toString(36)
         .substr(2, 9)}`;
 
+      // Deteksi MIME type yang benar berdasarkan ekstensi file
+      const getProperMimeType = (fileName: string, assetType?: string) => {
+        const extension = fileName.toLowerCase().split(".").pop();
+        switch (extension) {
+          case "jpg":
+          case "jpeg":
+            return "image/jpeg";
+          case "png":
+            return "image/png";
+          case "gif":
+            return "image/gif";
+          case "webp":
+            return "image/webp";
+          default:
+            return assetType && assetType.startsWith("image/")
+              ? assetType
+              : "image/jpeg";
+        }
+      };
+
+      const fileName = asset.fileName || `image_${imageId}.jpg`;
+      const properMimeType = getProperMimeType(fileName, asset.type);
+
+      console.log("🔍 File type detection:", {
+        originalType: asset.type,
+        fileName: fileName,
+        detectedType: properMimeType,
+      });
+
       // Buat object ImageData
       const newImage: ImageData = {
         id: imageId,
         uri: asset.uri,
-        name: asset.fileName || `image_${imageId}.jpg`,
-        type: asset.type || "image/jpeg",
+        name: fileName,
+        type: properMimeType, // Use properly detected MIME type
         size: fileInfo.exists && "size" in fileInfo ? fileInfo.size : 0,
         uploading: false,
         uploaded: false,
@@ -423,12 +452,42 @@ const ImageUploadComponent = ({
           .toString(36)
           .substr(2, 9)}_${validImages.length}`;
 
+        // Deteksi MIME type yang benar berdasarkan ekstensi file
+        const getProperMimeType = (fileName: string, assetType?: string) => {
+          const extension = fileName.toLowerCase().split(".").pop();
+          switch (extension) {
+            case "jpg":
+            case "jpeg":
+              return "image/jpeg";
+            case "png":
+              return "image/png";
+            case "gif":
+              return "image/gif";
+            case "webp":
+              return "image/webp";
+            default:
+              return assetType && assetType.startsWith("image/")
+                ? assetType
+                : "image/jpeg";
+          }
+        };
+
+        const fileName = asset.fileName || `image_${imageId}.jpg`;
+        const properMimeType = getProperMimeType(fileName, asset.type);
+
+        console.log("🔍 Multiple file type detection:", {
+          originalType: asset.type,
+          fileName: fileName,
+          detectedType: properMimeType,
+          index: validImages.length,
+        });
+
         // Buat object ImageData
         const newImage: ImageData = {
           id: imageId,
           uri: asset.uri,
-          name: asset.fileName || `image_${imageId}.jpg`,
-          type: asset.type || "image/jpeg",
+          name: fileName,
+          type: properMimeType, // Use properly detected MIME type
           size: fileInfo.exists && "size" in fileInfo ? fileInfo.size : 0,
           uploading: false,
           uploaded: false,
@@ -490,26 +549,58 @@ const ImageUploadComponent = ({
       );
       onImagesChange(updatedImages);
 
-      // Persiapan FormData untuk upload
+      // Persiapan FormData untuk upload sesuai API documentation
       const formData = new FormData();
 
-      // Tambahkan file ke FormData
+      // Tambahkan file ke FormData (required field)
       formData.append("file", {
         uri: imageData.uri,
         type: imageData.type,
         name: imageData.name,
       } as any);
 
-      // Tambahkan metadata
-      formData.append("bucket", "siger");
-      formData.append("folder", "dokumentasi-harian");
-      formData.append("originalName", imageData.name);
+      // Optional metadata - uncomment jika API backend membutuhkan
+      // formData.append("bucket", "siger");           // Optional: default bucket
+      // formData.append("folder", "dokumentasi-harian"); // Optional: custom folder
+      // formData.append("originalName", imageData.name);  // Optional: untuk penamaan yang lebih baik
 
       // Get API base URL
       const API_BASE_URL =
         process.env.EXPO_PUBLIC_API_BASE_URL || "http://localhost:3000";
 
-      // Upload ke server
+      console.log("🚀 Starting upload to:", `${API_BASE_URL}/api/upload-image`);
+
+      // Test network connectivity first
+      try {
+        console.log("🌐 Testing network connectivity...");
+        const testResponse = await fetch(`${API_BASE_URL}/api/full-projects`, {
+          method: "GET",
+          headers: {
+            Accept: "application/json",
+          },
+        });
+        console.log("✅ Network test response:", testResponse.status);
+      } catch (testError) {
+        console.error("❌ Network test failed:", testError);
+        throw new Error(
+          "Network connectivity test failed. Check your connection."
+        );
+      }
+      console.log("📝 Image info:", {
+        name: imageData.name,
+        type: imageData.type,
+        size: imageData.size,
+        uri: imageData.uri.substring(0, 50) + "...",
+      });
+
+      // Log FormData contents for debugging
+      console.log("📋 FormData contents:");
+      console.log("- file.name:", imageData.name);
+      console.log("- file.type:", imageData.type);
+      console.log("- file.uri length:", imageData.uri.length);
+
+      // Upload ke server - FIXED: Remove Content-Type header untuk multipart/form-data
+      // Browser/React Native akan auto-set dengan boundary yang benar
       const response = await fetch(`${API_BASE_URL}/api/upload-image`, {
         method: "POST",
         body: formData,
@@ -518,11 +609,19 @@ const ImageUploadComponent = ({
         },
       });
 
+      console.log("📡 Response status:", response.status);
+      console.log("📡 Response headers:", response.headers);
+
       if (!response.ok) {
-        throw new Error(`Upload failed with status: ${response.status}`);
+        const errorText = await response.text();
+        console.error("❌ Upload failed response:", errorText);
+        throw new Error(
+          `Upload failed with status: ${response.status} - ${errorText}`
+        );
       }
 
       const result = await response.json();
+      console.log("✅ Upload response:", result);
 
       if (result.success) {
         // Update status berhasil upload
@@ -538,12 +637,36 @@ const ImageUploadComponent = ({
             : img
         );
         onImagesChange(finalImages);
-        console.log("Image uploaded successfully:", result.data);
+        console.log("✅ Image uploaded successfully:", {
+          fileName: result.data.fileName,
+          path: result.data.path,
+          stored: {
+            minioPath: result.data.path,
+            minioFileName: result.data.fileName,
+          },
+        });
       } else {
         throw new Error(result.message || "Upload failed");
       }
     } catch (error) {
-      console.error("Error uploading image:", error);
+      console.error("❌ Error uploading image:", error);
+
+      // More detailed error logging
+      if (
+        error instanceof TypeError &&
+        error.message === "Network request failed"
+      ) {
+        const apiUrl =
+          process.env.EXPO_PUBLIC_API_BASE_URL || "http://localhost:3000";
+        console.error("🌐 Network Error Details:");
+        console.error("- Check if API server is running");
+        console.error("- Check if device can reach the API URL");
+        console.error("- API URL:", apiUrl);
+        console.error(
+          "- Try curl test:",
+          `curl -X POST ${apiUrl}/api/upload-image`
+        );
+      }
 
       // Update status error
       const errorImages = currentImages.map((img) =>
@@ -558,7 +681,14 @@ const ImageUploadComponent = ({
       );
       onImagesChange(errorImages);
 
-      Alert.alert("Error Upload", "Gagal mengupload gambar. Coba lagi nanti.");
+      const apiUrl =
+        process.env.EXPO_PUBLIC_API_BASE_URL || "http://localhost:3000";
+      Alert.alert(
+        "Error Upload",
+        `Gagal mengupload gambar.\n\nDetail: ${
+          (error as Error).message
+        }\n\nAPI: ${apiUrl}/api/upload-image`
+      );
     }
   };
 
@@ -570,8 +700,8 @@ const ImageUploadComponent = ({
       if (!imageToDelete) return;
 
       // Jika gambar sudah diupload ke server, hapus dari server juga
-      if (imageToDelete.uploaded && imageToDelete.minioFileName) {
-        await deleteImageFromServer(imageToDelete.minioFileName);
+      if (imageToDelete.uploaded && imageToDelete.minioPath) {
+        await deleteImageFromServer(imageToDelete.minioPath);
       }
 
       // Hapus dari array lokal
@@ -584,10 +714,12 @@ const ImageUploadComponent = ({
   };
 
   // Fungsi untuk menghapus gambar dari server
-  const deleteImageFromServer = async (fileName: string) => {
+  const deleteImageFromServer = async (filePath: string) => {
     try {
       const API_BASE_URL =
         process.env.EXPO_PUBLIC_API_BASE_URL || "http://localhost:3000";
+
+      console.log("🗑️ Deleting image from server:", filePath);
 
       const response = await fetch(`${API_BASE_URL}/api/delete-image`, {
         method: "DELETE",
@@ -596,17 +728,19 @@ const ImageUploadComponent = ({
         },
         body: JSON.stringify({
           bucket: "siger",
-          fileName: fileName,
+          fileName: filePath, // This should be the full path from upload response
         }),
       });
 
       const result = await response.json();
 
-      if (!result.success) {
-        console.warn("Failed to delete image from server:", result.message);
+      if (result.success) {
+        console.log("✅ Image deleted successfully from server");
+      } else {
+        console.warn("❌ Failed to delete image from server:", result.message);
       }
     } catch (error) {
-      console.error("Error deleting image from server:", error);
+      console.error("❌ Error deleting image from server:", error);
     }
   };
 
