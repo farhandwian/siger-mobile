@@ -221,24 +221,28 @@ interface ImageData {
   minioFileName?: string; // Nama file di Minio
 }
 
-// Komponen untuk upload dan preview gambar
+// Component for image upload and preview functionality
+// Handles multiple image selection, upload progress, and preview display
 const ImageUploadComponent = ({
-  images,
-  onImagesChange,
-  maxImages = 5,
-  maxSize = 5 * 1024 * 1024, // 5MB default
+  images, // Array of current images in the component
+  onImagesChange, // Callback function to update images array in parent component
+  maxImages = 5, // Maximum number of images allowed (default: 5)
+  maxSize = 5 * 1024 * 1024, // Maximum file size in bytes (default: 5MB)
 }: {
-  images: ImageData[];
+  images: ImageData[]; // Type definition for images array
   onImagesChange: (
-    images: ImageData[] | ((prev: ImageData[]) => ImageData[])
+    // Type definition for callback function
+    images: ImageData[] | ((prev: ImageData[]) => ImageData[]) // Supports both direct value and functional updates
   ) => void;
-  maxImages?: number;
-  maxSize?: number;
+  maxImages?: number; // Optional maximum images limit
+  maxSize?: number; // Optional maximum file size limit
 }) => {
   // Use ref to track latest images state for closures
+  // This prevents stale closure issues when async operations complete
   const imagesRef = useRef<ImageData[]>(images);
 
   // Update ref whenever images prop changes
+  // Ensures ref always contains the current state for async operations
   useEffect(() => {
     imagesRef.current = images;
   }, [images]);
@@ -259,25 +263,24 @@ const ImageUploadComponent = ({
     }
   };
 
-  // Fungsi untuk menampilkan pilihan sumber gambar (kamera atau galeri)
+  // Function to display image source selection alert
+  // Shows user options to pick images from camera or gallery with improved messaging
   const showImageSourceOptions = () => {
-    const remainingSlots = maxImages - images.length;
-
     Alert.alert(
-      "Pilih Sumber Gambar",
-      `Anda bisa menambah ${remainingSlots} gambar lagi\n\n• Kamera: Ambil 1 foto\n• Galeri: Pilih beberapa foto sekaligus`,
+      "Pilih Sumber Gambar", // Alert title
+      "Pilih sumber gambar untuk melengkapi dokumentasi kegiatan Anda.", // Simplified, professional message
       [
         {
-          text: "📷 Kamera",
-          onPress: () => pickImageFromCamera(),
+          text: "📷 Kamera", // Camera option with emoji for visual clarity
+          onPress: () => pickImageFromCamera(), // Triggers camera image picker
         },
         {
-          text: "🖼️ Galeri (Multiple)",
-          onPress: () => pickImageFromGallery(),
+          text: "🖼️ Galeri", // Gallery option with emoji for visual clarity
+          onPress: () => pickImageFromGallery(), // Triggers gallery image picker with multi-select
         },
         {
-          text: "Batal",
-          style: "cancel",
+          text: "Batal", // Cancel option
+          style: "cancel", // iOS cancel button styling
         },
       ]
     );

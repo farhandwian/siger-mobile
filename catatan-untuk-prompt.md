@@ -235,8 +235,6 @@ tolong tambahkan input fied untuk mengupload gamba. user bisa mengupload gambar,
 
 gambar tersebut akan disimpan di minio, lalu data dari minio(nama filenya dan pathnya) tersebut lah yang akan disimpan kedalam db lewat payload key files dalam api daily-sub-activities-update. api be nya itu menggunakan next js. jadi tolong anda buatkan komponennya, dan jika pada kodenya perlu menghit api next js untuk mengupload, mendelete, dan mendownload filenya, tolong integrasikan saja dulu dan berikan juga dokumentasinya yang lengkap nanti saya akan buatkan apinya.
 
-pada minionya saya sudah membuat bucker bernama siger, dengan folder dokumentasi-harian. saya ingin memasukan gambarnya kesana.
-
 tolong juga berikan penjelsan pada kodenya supaya saya mudah memahami kodenya.
 
 ------------------------
@@ -244,3 +242,9 @@ ternyata setiap merfersesh data dibawahnya, datanya itu pasti kembali ke salah s
 https://medium.com/@andrew.chester/react-native-infinite-scrolling-with-lazy-loading-a-step-by-step-guide-e91647348689
 
 tolong juga hilangkana bagina tampilan menu yang ada tulisan home, explore, dan dailyactivitie. lalu tolong hilangkan bagian atas dari menu yang berbentuk rectagle bewarna abu-abu , lalu perkecil tampilan untuk search dan filternya, tujuannya adalah agar list data mendapatkan ruang, supaya pengguan lebih enak membacanya
+-------------------------------
+
++++disini
+please improve style of alert that triggered after click upload field. do not tell this "Anda bisa menambah ${remainingSlots} gambar lagi\n\n• Kamera: Ambil 1 foto\n• Galeri: Pilih beberapa foto sekaligus",
+
+and on createTaskSucces when user click kembali ke beranda it should redirect back to listdailactivities

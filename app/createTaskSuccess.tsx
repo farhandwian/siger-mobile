@@ -3,38 +3,48 @@ import React from "react";
 import { Image, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 
 export default function CreateTaskSuccessScreen() {
+  // Initialize router for navigation between screens
   const router = useRouter();
 
+  // Function to navigate back to daily activities list screen
+  // This replaces the current screen in navigation stack to prevent going back to success screen
   const handleBackToHome = () => {
-    router.replace("/(tabs)"); // Navigate to main tabs
+    router.replace("/dailyActivities"); // Navigate back to daily activities list
   };
 
+  // Function to navigate back to create task form for creating another report
+  // This allows user to quickly create multiple reports in succession
   const handleCreateAnother = () => {
     router.replace("/createTask"); // Navigate back to create task form
   };
 
   return (
     <View style={styles.container}>
+      {/* Success icon - displays checkmark or success indicator */}
       <Image
         source={{
           uri: "http://localhost:3845/assets/720c3511213977afb46de015fe6bc42e5adceb97.svg",
         }}
         style={styles.icon}
       />
+      {/* Secondary illustration - provides visual context for success */}
       <Image
         source={{
           uri: "http://localhost:3845/assets/8064bb4d2fdd9c67cf9865dfecf4e7435fb8505a.svg",
         }}
         style={styles.icon2}
       />
+      {/* Main success message title */}
       <Text style={styles.title}>Laporan Harian Berhasil Dikirim!</Text>
+      {/* Subtitle with encouraging message for user */}
       <Text style={styles.subtitle}>
         Terima kasih telah melaporkan kegiatan harian, selamat melanjutkan
         aktivitas!
       </Text>
 
-      {/* Action Buttons */}
+      {/* Action Buttons Container - provides navigation options */}
       <View style={styles.buttonContainer}>
+        {/* Primary button - navigates back to daily activities list */}
         <TouchableOpacity
           style={[styles.button, styles.primaryButton]}
           onPress={handleBackToHome}
@@ -42,6 +52,7 @@ export default function CreateTaskSuccessScreen() {
           <Text style={styles.primaryButtonText}>Kembali ke Beranda</Text>
         </TouchableOpacity>
 
+        {/* Secondary button - allows creating another report quickly */}
         <TouchableOpacity
           style={[styles.button, styles.secondaryButton]}
           onPress={handleCreateAnother}
