@@ -3,7 +3,6 @@ import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
-  FlatList,
   Platform,
   StyleSheet,
   Text,
@@ -32,16 +31,7 @@ interface Props {
   height?: number;
 }
 
-interface SearchResult {
-  place_id: string;
-  description: string;
-  structured_formatting?: {
-    main_text: string;
-    secondary_text: string;
-  };
-}
-
-export default function MapLocationPicker({
+export default function SimpleMapLocationPicker({
   value,
   onChange,
   errorText,
@@ -61,17 +51,10 @@ export default function MapLocationPicker({
     value ? { latitude: value.latitude, longitude: value.longitude } : null
   );
   const [searchText, setSearchText] = useState("");
-  const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
-  const [showSearchResults, setShowSearchResults] = useState(false);
 
   const GOOGLE_MAPS_API_KEY =
     process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY ||
     "AIzaSyDJ_su_d2pygaLLlbGmuP7A3ckGwSq-yF8";
-
-  // Debug: Log the API key (remove in production)
-  useEffect(() => {
-    console.log("Google Maps API Key:", GOOGLE_MAPS_API_KEY);
-  }, [GOOGLE_MAPS_API_KEY]);
 
   // Reverse geocode to get address from coordinates
   const reverseGeocode = useCallback(
@@ -182,55 +165,24 @@ export default function MapLocationPicker({
     }
   };
 
-  // Search for places using Google Places API
-  const searchPlaces = useCallback(
-    async (query: string) => {
-      if (query.length < 2) {
-        setSearchResults([]);
-        setShowSearchResults(false);
-        return;
-      }
-
-      try {
-        const response = await fetch(
-          `https://maps.googleapis.com/maps/api/place/autocomplete/json?input=${encodeURIComponent(
-            query
-          )}&key=${GOOGLE_MAPS_API_KEY}&language=id&components=country:ID`
-        );
-        const data = await response.json();
-
-        if (data.predictions) {
-          setSearchResults(data.predictions);
-          setShowSearchResults(true);
-        } else {
-          setSearchResults([]);
-          setShowSearchResults(false);
-        }
-      } catch (error) {
-        console.error("Search error:", error);
-        setSearchResults([]);
-        setShowSearchResults(false);
-      }
-    },
-    [GOOGLE_MAPS_API_KEY]
-  );
-
-  // Handle place selection from search results
-  const handlePlaceSelect = async (placeId: string, description: string) => {
-    setShowSearchResults(false);
-    setSearchText(description);
-    setLoading(true);
+  // Simple search using Geocoding API
+  const handleSearch = async () => {
+    if (!searchText.trim()) return;
 
     try {
+      setLoading(true);
       const response = await fetch(
-        `https://maps.googleapis.com/maps/api/place/details/json?place_id=${placeId}&key=${GOOGLE_MAPS_API_KEY}&fields=geometry,formatted_address&language=id`
+        `https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(
+          searchText
+        )}&key=${GOOGLE_MAPS_API_KEY}&language=id&components=country:ID`
       );
       const data = await response.json();
 
-      if (data.result?.geometry?.location) {
+      if (data.results && data.results.length > 0) {
+        const result = data.results[0];
         const coords = {
-          latitude: data.result.geometry.location.lat,
-          longitude: data.result.geometry.location.lng,
+          latitude: result.geometry.location.lat,
+          longitude: result.geometry.location.lng,
         };
 
         const newRegion = {
@@ -245,31 +197,18 @@ export default function MapLocationPicker({
 
         onChange({
           ...coords,
-          address: data.result.formatted_address || description,
+          address: result.formatted_address,
         });
+      } else {
+        Alert.alert("Error", "Lokasi tidak ditemukan");
       }
-    } catch (error) {
-      console.error("Place details error:", error);
-      Alert.alert("Error", "Gagal mendapatkan detail lokasi");
-    } finally {
       setLoading(false);
+    } catch (error) {
+      setLoading(false);
+      console.error("Search error:", error);
+      Alert.alert("Error", "Gagal mencari lokasi");
     }
   };
-
-  // Handle search text changes with debouncing
-  const handleSearchTextChange = useCallback(
-    (text: string) => {
-      setSearchText(text);
-
-      // Simple debouncing
-      const timeoutId = setTimeout(() => {
-        searchPlaces(text);
-      }, 500);
-
-      return () => clearTimeout(timeoutId);
-    },
-    [searchPlaces]
-  );
 
   // Update marker position when value prop changes
   useEffect(() => {
@@ -292,44 +231,23 @@ export default function MapLocationPicker({
 
   return (
     <View style={styles.container}>
-      {/* Custom Search Bar */}
+      {/* Simple Search Bar */}
       <View style={styles.searchContainer}>
         <TextInput
           style={styles.searchInput}
-          placeholder="Cari lokasi..."
+          placeholder="Cari lokasi (contoh: Jakarta Pusat)"
           value={searchText}
-          onChangeText={handleSearchTextChange}
-          onFocus={() => setShowSearchResults(true)}
+          onChangeText={setSearchText}
+          onSubmitEditing={handleSearch}
           returnKeyType="search"
         />
-        {showSearchResults && searchResults.length > 0 && (
-          <View style={styles.searchResultsContainer}>
-            <FlatList
-              data={searchResults}
-              keyExtractor={(item) => item.place_id}
-              renderItem={({ item }) => (
-                <TouchableOpacity
-                  style={styles.searchResultItem}
-                  onPress={() =>
-                    handlePlaceSelect(item.place_id, item.description)
-                  }
-                >
-                  <Text style={styles.searchResultText} numberOfLines={2}>
-                    {item.structured_formatting?.main_text || item.description}
-                  </Text>
-                  {item.structured_formatting?.secondary_text && (
-                    <Text style={styles.searchResultSecondary}>
-                      {item.structured_formatting.secondary_text}
-                    </Text>
-                  )}
-                </TouchableOpacity>
-              )}
-              style={styles.searchResultsList}
-              showsVerticalScrollIndicator={false}
-              keyboardShouldPersistTaps="handled"
-            />
-          </View>
-        )}
+        <TouchableOpacity
+          style={styles.searchButton}
+          onPress={handleSearch}
+          disabled={loading}
+        >
+          <Text style={styles.searchButtonText}>Cari</Text>
+        </TouchableOpacity>
       </View>
 
       {/* Map Container */}
@@ -345,10 +263,6 @@ export default function MapLocationPicker({
           showsUserLocation={true}
           showsMyLocationButton={false}
           toolbarEnabled={false}
-          mapType="standard"
-          onMapReady={() => {
-            console.log("Map is ready");
-          }}
         >
           {marker && (
             <Marker
@@ -406,22 +320,42 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
+  searchContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    marginBottom: 10,
+  },
+  searchInput: {
+    flex: 1,
+    backgroundColor: "#f9fafb",
+    borderColor: "#e5e7eb",
+    borderWidth: 1,
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 12,
+    fontSize: 15,
+    color: "#101828",
+  },
+  searchButton: {
+    backgroundColor: "#3b82f6",
+    borderRadius: 8,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+  },
+  searchButtonText: {
+    color: "#fff",
+    fontSize: 14,
+    fontWeight: "500",
+  },
   mapContainer: {
     position: "relative",
-    marginTop: 10,
     borderRadius: 12,
     overflow: "hidden",
     backgroundColor: "#f0f0f0",
-    elevation: 2,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
   },
   map: {
     flex: 1,
-    width: "100%",
-    height: "100%",
   },
   loadingOverlay: {
     position: "absolute",
@@ -490,62 +424,5 @@ const styles = StyleSheet.create({
     color: "#475569",
     marginTop: 4,
     lineHeight: 18,
-  },
-  emptyContainer: {
-    padding: 15,
-    alignItems: "center",
-  },
-  emptyText: {
-    fontSize: 14,
-    color: "#9ca3af",
-    textAlign: "center",
-  },
-  searchContainer: {
-    position: "relative",
-    zIndex: 10,
-  },
-  searchInput: {
-    backgroundColor: "#f9fafb",
-    borderColor: "#e5e7eb",
-    borderWidth: 1,
-    borderRadius: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 12,
-    fontSize: 15,
-    color: "#101828",
-    marginBottom: 5,
-  },
-  searchResultsContainer: {
-    position: "absolute",
-    top: 50,
-    left: 0,
-    right: 0,
-    backgroundColor: "#fff",
-    borderRadius: 8,
-    elevation: 3,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 3.84,
-    maxHeight: 200,
-    zIndex: 20,
-  },
-  searchResultsList: {
-    borderRadius: 8,
-  },
-  searchResultItem: {
-    padding: 15,
-    borderBottomWidth: 0.5,
-    borderBottomColor: "#e5e7eb",
-  },
-  searchResultText: {
-    fontSize: 14,
-    color: "#101828",
-    fontWeight: "500",
-  },
-  searchResultSecondary: {
-    fontSize: 12,
-    color: "#6b7280",
-    marginTop: 2,
   },
 });

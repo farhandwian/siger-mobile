@@ -12,6 +12,10 @@ const LoginScreen = () => {
     router.replace("/createTask");
   };
 
+  const goToMapDemo = () => {
+    router.push("/mapDemo");
+  };
+
   return (
     <View style={styles.container}>
       <Text style={styles.title}>Login</Text>
@@ -30,6 +34,11 @@ const LoginScreen = () => {
         secureTextEntry
       />
       <Button title="Login" onPress={handleLogin} />
+
+      {/* Temporary Map Demo Access */}
+      {/* <TouchableOpacity style={styles.demoButton} onPress={goToMapDemo}>
+        <Text style={styles.demoButtonText}>🗺️ Go to Map Demo</Text>
+      </TouchableOpacity> */}
     </View>
   );
 };
@@ -57,6 +66,20 @@ const styles = StyleSheet.create({
     marginBottom: 16,
     paddingHorizontal: 12,
     backgroundColor: "#fff",
+  },
+  demoButton: {
+    marginTop: 20,
+    backgroundColor: "#3b82f6",
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    borderRadius: 8,
+    width: "80%",
+    alignItems: "center",
+  },
+  demoButtonText: {
+    color: "#fff",
+    fontSize: 16,
+    fontWeight: "600",
   },
 });
 

@@ -1,5 +1,5 @@
-import { useRouter } from "expo-router";
-import React, { useEffect, useState } from "react";
+import { useLocalSearchParams, useRouter } from "expo-router";
+import React, { useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -15,7 +15,9 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-import MapLocationPicker, { LocationValue } from "../components/MapLocationPicker";
+import MapLocationPicker, {
+  LocationValue,
+} from "../components/MapLocationPicker";
 
 // Custom Dropdown Component
 const CustomDropdown = ({
@@ -207,6 +209,7 @@ const CustomDropdown = ({
 
 export default function CreateTaskScreen() {
   const router = useRouter();
+  const params = useLocalSearchParams();
 
   // API Data states
   const [projectsData, setProjectsData] = useState<any[]>([]);
@@ -221,7 +224,45 @@ export default function CreateTaskScreen() {
   const [catatan, setCatatan] = useState(
     "Telah dilaksanakan mobilisasi untuk persiapan awal proyek. Kegiatan meliputi pembersihan lokasi dan pengiriman material tahap pertama."
   );
-  const [location, setLocation] = useState<LocationValue | undefined>(undefined);
+  const [location, setLocation] = useState<LocationValue | undefined>(
+    undefined
+  );
+
+  // Debug location state changes
+  useEffect(() => {
+    console.log("Location state changed:", location);
+  }, [location]);
+
+  // Memoize location params to prevent infinite loops
+  const locationParams = useMemo(
+    () => ({
+      latitude: params.selectedLatitude,
+      longitude: params.selectedLongitude,
+      address: params.selectedAddress,
+    }),
+    [params.selectedLatitude, params.selectedLongitude, params.selectedAddress]
+  );
+
+  // Handle location data from locationForm
+  useEffect(() => {
+    console.log("CreateTask params received:", locationParams);
+    if (locationParams.latitude && locationParams.longitude) {
+      const newLatitude = parseFloat(locationParams.latitude as string);
+      const newLongitude = parseFloat(locationParams.longitude as string);
+      const newAddress = (locationParams.address as string) || "";
+
+      console.log("Setting location from params:", {
+        latitude: newLatitude,
+        longitude: newLongitude,
+        address: newAddress,
+      });
+      setLocation({
+        latitude: newLatitude,
+        longitude: newLongitude,
+        address: newAddress,
+      });
+    }
+  }, [locationParams]);
 
   // Get today's date in YYYY-MM-DD format
   const getTodayDate = () => {
@@ -491,11 +532,15 @@ export default function CreateTaskScreen() {
       Alert.alert("Error", "Pilih sub kegiatan terlebih dahulu");
       return;
     }
+    if (!location) {
+      Alert.alert("Error", "Pilih lokasi terlebih dahulu");
+      return;
+    }
 
     setSubmitting(true);
 
     try {
-      const API_BASE_URL = "http://192.168.11.122:3000";
+      const API_BASE_URL = "http://10.44.44.20:3000";
 
       // Prepare payload according to API specification
       const payload = {
@@ -503,12 +548,9 @@ export default function CreateTaskScreen() {
         sub_activities_id: selectedSubActivity,
         tanggal_progres: tanggalProgres,
         progres_realisasi_per_hari: parseFloat(progress) || 0,
-        koordinat: location ? {
+        koordinat: {
           latitude: location.latitude,
           longitude: location.longitude,
-        } : {
-          latitude: -6.2088, // Default Jakarta coordinates
-          longitude: 106.8456,
         },
         catatan_kegiatan: catatan.trim(),
         files: [
@@ -672,48 +714,84 @@ export default function CreateTaskScreen() {
             </View>
             {/* Koordinat Lokasi dengan Peta */}
             <View style={styles.formGroup}>
-              <Text style={styles.label}>Koordinat Lokasi</Text>
-              <MapLocationPicker
-                value={location}
-                onChange={setLocation}
-                height={250}
-                showMyLocationButton={true}
-              />
+              <Text style={styles.label}>Koordinat Lokasi *</Text>
+
+              {location ? (
+                // Location Preview Mode
+                <View>
+                  <TouchableOpacity
+                    style={styles.locationPreviewContainer}
+                    onPress={() => {
+                      router.push({
+                        pathname: "/locationForm",
+                        params: {
+                          latitude: location.latitude.toString(),
+                          longitude: location.longitude.toString(),
+                          address: location.address || "",
+                        },
+                      });
+                    }}
+                  >
+                    <View style={styles.locationPreviewMap}>
+                      <MapLocationPicker
+                        value={location}
+                        onChange={() => {}} // Disabled in preview mode
+                        height={150}
+                        showMyLocationButton={false}
+                        initialRegion={{
+                          latitude: location.latitude,
+                          longitude: location.longitude,
+                          latitudeDelta: 0.01,
+                          longitudeDelta: 0.01,
+                        }}
+                      />
+                      <View style={styles.previewOverlay}>
+                        <Text style={styles.previewOverlayText}>
+                          Ketuk untuk mengubah lokasi
+                        </Text>
+                      </View>
+                    </View>
+
+                    <View style={styles.locationInfo}>
+                      <Text style={styles.locationInfoTitle}>
+                        📍 Lokasi Terpilih
+                      </Text>
+                      <Text style={styles.coordinateText}>
+                        {location.latitude.toFixed(6)},{" "}
+                        {location.longitude.toFixed(6)}
+                      </Text>
+                      {location.address && (
+                        <Text style={styles.addressText} numberOfLines={2}>
+                          {location.address}
+                        </Text>
+                      )}
+                      <Text style={styles.editLocationText}>
+                        Ketuk untuk mengubah →
+                      </Text>
+                    </View>
+                  </TouchableOpacity>
+                </View>
+              ) : (
+                // No Location Selected Mode
+                <TouchableOpacity
+                  style={styles.selectLocationButton}
+                  onPress={() => {
+                    router.push("/locationForm");
+                  }}
+                >
+                  <Text style={styles.selectLocationIcon}>📍</Text>
+                  <Text style={styles.selectLocationText}>Pilih Lokasi</Text>
+                  <Text style={styles.selectLocationSubtext}>
+                    Ketuk untuk memilih lokasi di peta
+                  </Text>
+                </TouchableOpacity>
+              )}
+
+              {!location && (
+                <Text style={styles.errorText}>Lokasi wajib dipilih</Text>
+              )}
             </View>
 
-            {/* Latitude & Longitude Display */}
-            {location && (
-              <>
-                <View style={styles.formGroup}>
-                  <Text style={styles.label}>Latitude</Text>
-                  <TextInput
-                    style={[styles.input, styles.disabledInput]}
-                    value={location.latitude.toFixed(6)}
-                    editable={false}
-                  />
-                </View>
-                <View style={styles.formGroup}>
-                  <Text style={styles.label}>Longitude</Text>
-                  <TextInput
-                    style={[styles.input, styles.disabledInput]}
-                    value={location.longitude.toFixed(6)}
-                    editable={false}
-                  />
-                </View>
-                {location.address && (
-                  <View style={styles.formGroup}>
-                    <Text style={styles.label}>Alamat</Text>
-                    <TextInput
-                      style={styles.input}
-                      value={location.address}
-                      onChangeText={(text) => setLocation({ ...location, address: text })}
-                      multiline
-                      placeholder="Alamat dapat diedit manual jika diperlukan"
-                    />
-                  </View>
-                )}
-              </>
-            )}
             {/* Gambar */}
             <View style={styles.formGroup}>
               <Text style={styles.label}>Gambar Kegiatan (Max 5MB)</Text>
@@ -960,5 +1038,93 @@ const styles = StyleSheet.create({
     color: "#1a365d",
     fontWeight: "bold",
     fontSize: 16,
+  },
+  // Location preview styles
+  locationPreviewContainer: {
+    borderWidth: 1,
+    borderColor: "#e5e7eb",
+    borderRadius: 12,
+    overflow: "hidden",
+    backgroundColor: "#fff",
+  },
+  locationPreviewMap: {
+    position: "relative",
+  },
+  previewOverlay: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: "rgba(0, 0, 0, 0.3)",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  previewOverlayText: {
+    color: "#fff",
+    fontSize: 14,
+    fontWeight: "600",
+    backgroundColor: "rgba(0, 0, 0, 0.7)",
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 6,
+  },
+  locationInfo: {
+    padding: 16,
+    backgroundColor: "#f9fafb",
+  },
+  locationInfoTitle: {
+    fontSize: 16,
+    fontWeight: "600",
+    color: "#101828",
+    marginBottom: 8,
+  },
+  coordinateText: {
+    fontSize: 13,
+    color: "#6b7280",
+    fontFamily: "monospace",
+    marginBottom: 4,
+  },
+  addressText: {
+    fontSize: 13,
+    color: "#374151",
+    marginTop: 4,
+    lineHeight: 18,
+  },
+  editLocationText: {
+    fontSize: 12,
+    color: "#1d4ed8",
+    marginTop: 8,
+    fontWeight: "500",
+  },
+  selectLocationButton: {
+    backgroundColor: "#f9fafb",
+    borderWidth: 2,
+    borderColor: "#e5e7eb",
+    borderStyle: "dashed",
+    borderRadius: 12,
+    padding: 24,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  selectLocationIcon: {
+    fontSize: 32,
+    marginBottom: 8,
+  },
+  selectLocationText: {
+    fontSize: 16,
+    fontWeight: "600",
+    color: "#101828",
+    marginBottom: 4,
+  },
+  selectLocationSubtext: {
+    fontSize: 13,
+    color: "#6b7280",
+    textAlign: "center",
+  },
+  errorText: {
+    fontSize: 12,
+    color: "#dc2626",
+    marginTop: 4,
   },
 });

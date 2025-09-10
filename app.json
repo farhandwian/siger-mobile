@@ -8,23 +8,37 @@
     "scheme": "sigermobile",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": false,
+    "splash": {
+      "image": "./assets/images/splash-icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#1A365D"
+    },
     "ios": {
       "supportsTablet": true,
-      "config": {
-        "googleMapsApiKey": "AIzaSyAS26jpTPNY_nY3ruz2ueMGAxRr0vf-9ss"
+      "bundleIdentifier": "com.sigermobile.app",
+      "splash": {
+        "image": "./assets/images/splash-icon.png",
+        "resizeMode": "contain",
+        "backgroundColor": "#1A365D",
+        "tabletImage": "./assets/images/splash-icon.png"
       }
     },
     "android": {
+      "package": "com.sigermobile.app",
+      "permissions": [
+        "ACCESS_COARSE_LOCATION",
+        "ACCESS_FINE_LOCATION"
+      ],
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/adaptive-icon.png",
         "backgroundColor": "#ffffff"
       },
-      "edgeToEdgeEnabled": true,
       "config": {
         "googleMaps": {
-          "apiKey": "AIzaSyAS26jpTPNY_nY3ruz2ueMGAxRr0vf-9ss"
+          "apiKey": "AIzaSyDJ_su_d2pygaLLlbGmuP7A3ckGwSq-yF8"
         }
-      }
+      },
+      "edgeToEdgeEnabled": true
     },
     "web": {
       "bundler": "metro",
@@ -32,7 +46,15 @@
       "favicon": "./assets/images/favicon.png"
     },
     "plugins": [
+      [
+        "react-native-maps",
+        {
+          "iosGoogleMapsApiKey": "AIzaSyDJ_su_d2pygaLLlbGmuP7A3ckGwSq-yF8",
+          "androidGoogleMapsApiKey": "AIzaSyDJ_su_d2pygaLLlbGmuP7A3ckGwSq-yF8"
+        }
+      ],
       "expo-router",
+      "expo-location",
       [
         "expo-splash-screen",
         {
