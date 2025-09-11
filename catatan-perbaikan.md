@@ -1,0 +1,1 @@
+-when upload on progress it doesnt show the loading

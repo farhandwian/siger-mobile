@@ -249,3 +249,8 @@ please improve style of alert that triggered after click upload field. do not te
 
 and on createTaskSucces when user click kembali ke beranda it should redirect back to listdailactivities
 -------------------------------------
+so before fill the actual input, i want user to choose kegiatan first. and then it should get related data and put it in on the input field so it will be like update than create(use subactivityid, userid, and tanggal_proggres to get the data), if there is no data then show the default data and it will be create.
+
+and make the input tanggal disabed, and by deafautl the value is today.
+
+so to be more clear, i want this feature can write the data only on current time

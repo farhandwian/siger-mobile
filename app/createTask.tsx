@@ -1066,6 +1066,15 @@ const ImageUploadComponent = ({
   );
 };
 
+// CreateTaskScreen Component
+// This screen allows users to create or update daily progress reports
+// Flow:
+// 1. User selects Project → Activity → Sub-Activity (cascade dropdowns)
+// 2. When Sub-Activity is selected, check if data already exists for today
+// 3. If exists: populate form (UPDATE mode), if not: show empty form (CREATE mode)
+// 4. Date is always disabled and set to today (can only report current day)
+// 5. Submit uses upsert API that handles create/update based on composite key:
+//    subactivityid + userid + tanggal_progres
 export default function CreateTaskScreen() {
   const router = useRouter();
 
@@ -1078,11 +1087,13 @@ export default function CreateTaskScreen() {
   const [selectedProject, setSelectedProject] = useState("");
   const [selectedActivity, setSelectedActivity] = useState("");
   const [selectedSubActivity, setSelectedSubActivity] = useState("");
-  const [progress, setProgress] = useState("2");
-  const [catatan, setCatatan] = useState(
-    "Telah dilaksanakan mobilisasi untuk persiapan awal proyek. Kegiatan meliputi pembersihan lokasi dan pengiriman material tahap pertama."
-  );
+  const [progress, setProgress] = useState("");
+  const [catatan, setCatatan] = useState("");
   const [koordinat, setKoordinat] = useState("");
+
+  // State to track if we're in update mode (existing data found) or create mode
+  const [isUpdateMode, setIsUpdateMode] = useState(false);
+  const [loadingExistingData, setLoadingExistingData] = useState(false);
 
   // State untuk mengelola gambar yang diupload
   const [uploadedImages, setUploadedImages] = useState<ImageData[]>([]);
@@ -1147,6 +1158,8 @@ export default function CreateTaskScreen() {
     return today.toISOString().split("T")[0];
   };
 
+  // Date is always set to today and cannot be changed
+  // This ensures users can only report progress for the current day
   const [tanggalProgres, setTanggalProgres] = useState(getTodayDate());
 
   // Fetch projects data on component mount
@@ -1198,6 +1211,166 @@ export default function CreateTaskScreen() {
     } finally {
       setLoading(false);
     }
+  };
+
+  // Function to fetch existing daily activity data for the selected sub-activity
+  // This checks if there's already data for today's date and populates the form
+  // The API uses upsert approach with composite key: subactivityid + userid + tanggal_progres
+  // If data exists, we populate form for "update mode", otherwise "create mode"
+  const fetchExistingDailyData = async (subActivityId: string) => {
+    if (!subActivityId) return;
+
+    try {
+      setLoadingExistingData(true);
+
+      // Get API base URL from environment variables
+      const API_BASE_URL =
+        process.env.EXPO_PUBLIC_API_BASE_URL || "http://localhost:3000";
+
+      // Use hardcoded user ID for now (same as in handleSubmit)
+      const userId = "cmfb8i5yo0000vpgc5p776720";
+      const todayDate = getTodayDate();
+
+      console.log("🔍 Fetching existing data for composite key:", {
+        subActivityId,
+        userId,
+        date: todayDate,
+      });
+
+      // Construct query parameters for the API call
+      // Based on the API schema: DailySubActivitiesQuerySchema
+      const queryParams = new URLSearchParams({
+        subActivityId: subActivityId,
+        userId: userId,
+        tanggalProgres: todayDate,
+        limit: "1", // We only need to check if data exists, so limit to 1
+      });
+
+      console.log(
+        "🌐 Making request to:",
+        `${API_BASE_URL}/api/daily-sub-activities/list?${queryParams}`
+      );
+
+      const response = await fetch(
+        `${API_BASE_URL}/api/daily-sub-activities/list?${queryParams}`,
+        {
+          method: "GET",
+          headers: {
+            "Content-Type": "application/json",
+          },
+        }
+      );
+
+      if (!response.ok) {
+        // If 404 or other errors, it means no existing data - this is normal for create mode
+        if (response.status === 404) {
+          console.log("📝 No existing data found (404) - create mode");
+          setIsUpdateMode(false);
+          setDefaultFormData();
+          return;
+        }
+
+        console.warn(
+          `⚠️ API returned status ${response.status}, treating as no data found`
+        );
+        setIsUpdateMode(false);
+        setDefaultFormData();
+        return;
+      }
+
+      const result = await response.json();
+
+      console.log("📦 API Response:", {
+        success: result.success,
+        dataType: Array.isArray(result.data) ? "array" : typeof result.data,
+        dataLength: Array.isArray(result.data)
+          ? result.data.length
+          : "not array",
+        pagination: result.pagination,
+      });
+
+      if (
+        result.success &&
+        result.data &&
+        Array.isArray(result.data) &&
+        result.data.length > 0
+      ) {
+        // Data exists - update mode
+        const existingData = result.data[0]; // Get the first (and should be only) record
+        console.log("✅ Existing data found - update mode:", existingData);
+        setIsUpdateMode(true);
+        populateFormWithExistingData(existingData);
+      } else {
+        // No data found - create mode
+        console.log("📝 No existing data found - create mode");
+        console.log(
+          "📝 Reason: success =",
+          result.success,
+          "data length =",
+          Array.isArray(result.data) ? result.data.length : "not array"
+        );
+        setIsUpdateMode(false);
+        setDefaultFormData();
+      }
+    } catch (error) {
+      console.error("Error fetching existing daily data:", error);
+      console.log("📝 Error occurred - defaulting to create mode");
+      setIsUpdateMode(false);
+      setDefaultFormData();
+    } finally {
+      setLoadingExistingData(false);
+    }
+  };
+
+  // Function to populate form with existing data for update mode
+  const populateFormWithExistingData = (data: any) => {
+    console.log("🔄 Populating form with existing data:", data);
+
+    // Set form fields with existing data based on API schema
+    // progresRealisasiPerHari is the field name in the API response
+    setProgress(data.progresRealisasiPerHari?.toString() || "");
+    // catatanKegiatan is the field name in the API response
+    setCatatan(data.catatanKegiatan || "");
+
+    // Set coordinates if available
+    if (data.koordinat) {
+      const koordinatString = `${data.koordinat.latitude}, ${data.koordinat.longitude}`;
+      setKoordinat(koordinatString);
+    }
+
+    // Handle existing images/files if any
+    // 'file' is the field name in the API response (JSON array)
+    if (data.file && Array.isArray(data.file)) {
+      // Convert existing files to ImageData format for display
+      const existingImages: ImageData[] = data.file.map(
+        (file: any, index: number) => ({
+          id: `existing_${index}_${Date.now()}`,
+          uri: file.url || "", // Assuming the API returns file URLs
+          name: file.file || `file_${index}`,
+          type: "image/jpeg", // Default type
+          size: 0, // Unknown size for existing files
+          uploaded: true,
+          uploading: false,
+          minioPath: file.path,
+          minioFileName: file.file,
+        })
+      );
+
+      debugSetUploadedImages(existingImages);
+    }
+  };
+
+  // Function to set default form data for create mode
+  const setDefaultFormData = () => {
+    console.log("📝 Setting default form data for create mode");
+
+    // Clear form fields to default values
+    setProgress("");
+    setCatatan("");
+    setKoordinat("");
+
+    // Clear uploaded images
+    debugSetUploadedImages([]);
   };
 
   // Mock data fallback for development
@@ -1396,6 +1569,8 @@ export default function CreateTaskScreen() {
 
   const handleSubActivityChange = (subActivityId: any) => {
     setSelectedSubActivity(subActivityId);
+    // Fetch existing data for the selected sub-activity and today's date
+    fetchExistingDailyData(subActivityId);
   };
 
   const handleSubmit = async () => {
@@ -1427,32 +1602,47 @@ export default function CreateTaskScreen() {
           path: img.minioPath!,
         }));
 
-      // Prepare payload according to API specification
+      // Prepare payload for upsert API
+      // The API will automatically determine create vs update based on composite key:
+      // - sub_activities_id + user_id + tanggal_progres
+      // If combination exists: UPDATE existing record
+      // If combination doesn't exist: CREATE new record
       const payload = {
-        user_id: "cmfb8i5yo0000vpgc5p776720",
-        sub_activities_id: selectedSubActivity,
-        tanggal_progres: tanggalProgres,
+        user_id: "cmfb8i5yo0000vpgc5p776720", // Part of composite key
+        sub_activities_id: selectedSubActivity, // Part of composite key
+        tanggal_progres: tanggalProgres, // Part of composite key
         progres_realisasi_per_hari: parseFloat(progress) || 0,
         koordinat: {
-          latitude: -6.2088, // Dummy coordinates (Jakarta)
-          longitude: 106.8456,
+          latitude: -5.389364311787856, // Dummy coordinates (Jakarta)
+          longitude: 105.2952872725199,
         },
         catatan_kegiatan: catatan.trim(),
-        files: uploadedFiles, // Gunakan files yang sudah diupload
+        files: uploadedFiles, // Use uploaded files from Minio
       };
 
-      console.log("Submitting daily progress:", payload);
-
-      const response = await fetch(
-        `${API_BASE_URL}/api/daily-sub-activities-update`,
-        {
-          method: "PUT",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify(payload),
-        }
+      console.log(
+        `Submitting daily progress (${
+          isUpdateMode ? "UPDATE" : "CREATE"
+        } mode):`,
+        payload
       );
+
+      // Always use the upsert API endpoint - it handles create/update automatically
+      // based on the composite key: subactivityid + userid + tanggal_progres
+      const endpoint = `${API_BASE_URL}/api/daily-sub-activities-update`;
+
+      console.log(`Making PUT request to: ${endpoint}`);
+      console.log(
+        `API will upsert based on key: subactivityid(${selectedSubActivity}) + userid(cmfb8i5yo0000vpgc5p776720) + tanggal_progres(${tanggalProgres})`
+      );
+
+      const response = await fetch(endpoint, {
+        method: "PUT", // Always use PUT since API uses upsert approach
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(payload),
+      });
 
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
@@ -1461,18 +1651,25 @@ export default function CreateTaskScreen() {
       const result = await response.json();
 
       if (result.success) {
-        console.log("Daily progress updated successfully:", result);
-        Alert.alert("Berhasil", "Laporan harian berhasil dikirim!", [
+        console.log("Daily progress upserted successfully:", result);
+        // Show success message based on whether it was an update or create operation
+        const successMessage = isUpdateMode
+          ? "Laporan harian berhasil diperbarui!"
+          : "Laporan harian berhasil dibuat!";
+        Alert.alert("Berhasil", successMessage, [
           { text: "OK", onPress: () => router.replace("/createTaskSuccess") },
         ]);
       } else {
-        throw new Error(result.message || "Failed to update daily progress");
+        throw new Error(result.message || "Failed to upsert daily progress");
       }
     } catch (error: any) {
-      console.error("Error submitting daily progress:", error);
+      console.error("Error upserting daily progress:", error);
+      const errorMessage = isUpdateMode
+        ? "Laporan gagal diperbarui."
+        : "Laporan gagal dibuat.";
       Alert.alert(
         "Gagal",
-        "Laporan gagal dikirim. Silakan coba lagi.\n\nDetail: " +
+        `${errorMessage} Silakan coba lagi.\n\nDetail: ` +
           (error.message || error.toString())
       );
     } finally {
@@ -1563,18 +1760,60 @@ export default function CreateTaskScreen() {
                   placeholder="Pilih Sub Kegiatan"
                   searchable={true}
                 />
+                {loadingExistingData && (
+                  <View style={styles.loadingIndicator}>
+                    <ActivityIndicator size="small" color="#1a365d" />
+                    <Text style={styles.loadingText}>
+                      Mengecek data yang sudah ada...
+                    </Text>
+                  </View>
+                )}
               </View>
             )}
 
-            {/* Tanggal Progres */}
+            {/* Mode indicator - Only show when sub-activity is selected */}
+            {selectedSubActivity && !loadingExistingData && (
+              <View style={styles.modeIndicator}>
+                <View
+                  style={[
+                    styles.modeIndicatorBadge,
+                    isUpdateMode
+                      ? styles.updateModeBadge
+                      : styles.createModeBadge,
+                  ]}
+                >
+                  <Text
+                    style={[
+                      styles.modeIndicatorText,
+                      isUpdateMode
+                        ? styles.updateModeText
+                        : styles.createModeText,
+                    ]}
+                  >
+                    {isUpdateMode ? "📝 MODE: UPDATE" : "✨ MODE: CREATE"}
+                  </Text>
+                </View>
+                <Text style={styles.modeDescription}>
+                  {isUpdateMode
+                    ? "Data hari ini sudah ada, form akan memperbarui data yang sudah ada."
+                    : "Belum ada data hari ini, form akan membuat data baru."}
+                </Text>
+              </View>
+            )}
+
+            {/* Tanggal Progres - Disabled and set to today */}
             <View style={styles.formGroup}>
               <Text style={styles.label}>Tanggal Progres *</Text>
               <TextInput
-                style={styles.input}
+                style={[styles.input, styles.disabledInput]}
                 value={tanggalProgres}
-                onChangeText={setTanggalProgres}
                 placeholder="YYYY-MM-DD"
+                editable={false}
+                selectTextOnFocus={false}
               />
+              <Text style={styles.helperText}>
+                Data hanya dapat diisi untuk hari ini
+              </Text>
             </View>
 
             {/* Progress */}
@@ -1624,7 +1863,13 @@ export default function CreateTaskScreen() {
               disabled={submitting}
             >
               <Text style={styles.buttonText}>
-                {submitting ? "Mengirim..." : "Kirim Laporan"}
+                {submitting
+                  ? isUpdateMode
+                    ? "Memperbarui..."
+                    : "Mengirim..."
+                  : isUpdateMode
+                  ? "Perbarui Laporan"
+                  : "Kirim Laporan"}
               </Text>
             </TouchableOpacity>
           </View>
@@ -1989,5 +2234,61 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: "#0369a1",
     textAlign: "center",
+  },
+  helperText: {
+    fontSize: 12,
+    color: "#6b7280",
+    marginTop: 4,
+    fontStyle: "italic",
+  },
+  loadingIndicator: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginTop: 8,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    backgroundColor: "#f0f9ff",
+    borderRadius: 6,
+  },
+  modeIndicator: {
+    marginBottom: 18,
+    padding: 12,
+    backgroundColor: "#f8fafc",
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: "#e2e8f0",
+  },
+  modeIndicatorBadge: {
+    alignSelf: "flex-start",
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 4,
+    marginBottom: 8,
+  },
+  updateModeBadge: {
+    backgroundColor: "#fef3c7",
+    borderColor: "#f59e0b",
+    borderWidth: 1,
+  },
+  createModeBadge: {
+    backgroundColor: "#dcfce7",
+    borderColor: "#16a34a",
+    borderWidth: 1,
+  },
+  modeIndicatorText: {
+    fontSize: 11,
+    fontWeight: "600",
+    letterSpacing: 0.5,
+  },
+  updateModeText: {
+    color: "#92400e",
+  },
+  createModeText: {
+    color: "#166534",
+  },
+  modeDescription: {
+    fontSize: 12,
+    color: "#64748b",
+    lineHeight: 16,
   },
 });
