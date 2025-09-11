@@ -1078,7 +1078,7 @@ export default function CreateTaskScreen() {
   const [selectedProject, setSelectedProject] = useState("");
   const [selectedActivity, setSelectedActivity] = useState("");
   const [selectedSubActivity, setSelectedSubActivity] = useState("");
-  const [progress, setProgress] = useState("1.015");
+  const [progress, setProgress] = useState("2");
   const [catatan, setCatatan] = useState(
     "Telah dilaksanakan mobilisasi untuk persiapan awal proyek. Kegiatan meliputi pembersihan lokasi dan pengiriman material tahap pertama."
   );

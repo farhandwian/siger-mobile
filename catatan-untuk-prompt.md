@@ -248,3 +248,4 @@ tolong juga hilangkana bagina tampilan menu yang ada tulisan home, explore, dan 
 please improve style of alert that triggered after click upload field. do not tell this "Anda bisa menambah ${remainingSlots} gambar lagi\n\n• Kamera: Ambil 1 foto\n• Galeri: Pilih beberapa foto sekaligus",
 
 and on createTaskSucces when user click kembali ke beranda it should redirect back to listdailactivities
+-------------------------------------
