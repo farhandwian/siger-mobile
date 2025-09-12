@@ -622,6 +622,16 @@ export default function CreateTaskScreen() {
     );
   }
 
+  // Debug location preview rendering
+  if (location) {
+    console.log("About to render location preview:", {
+      latitude: location.latitude,
+      longitude: location.longitude,
+      address: location.address,
+      addressLength: location.address?.length || 0
+    });
+  }
+
   return (
     <View style={styles.container}>
       {/* Topbar */}
@@ -738,6 +748,7 @@ export default function CreateTaskScreen() {
                         onChange={() => {}} // Disabled in preview mode
                         height={150}
                         showMyLocationButton={false}
+                        showLocationInfo={false}
                         initialRegion={{
                           latitude: location.latitude,
                           longitude: location.longitude,
@@ -760,11 +771,19 @@ export default function CreateTaskScreen() {
                         {location.latitude.toFixed(6)},{" "}
                         {location.longitude.toFixed(6)}
                       </Text>
-                      {location.address && (
-                        <Text style={styles.addressText} numberOfLines={2}>
-                          {location.address}
-                        </Text>
-                      )}
+                      {location.address && (() => {
+                        // Filter out potentially duplicate text
+                        const cleanAddress = location.address
+                          .replace(/lokasi\s*terpilih:?\s*/gi, '')
+                          .replace(/koordinat\s*terpilih:?\s*/gi, '')
+                          .trim();
+                        
+                        return cleanAddress ? (
+                          <Text style={styles.addressText} numberOfLines={2}>
+                            {cleanAddress}
+                          </Text>
+                        ) : null;
+                      })()}
                       <Text style={styles.editLocationText}>
                         Ketuk untuk mengubah →
                       </Text>

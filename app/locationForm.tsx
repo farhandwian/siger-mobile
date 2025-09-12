@@ -186,6 +186,12 @@ export default function LocationFormScreen() {
       address: addressInput.trim() || location.address,
     };
 
+    console.log("LocationForm - Saving location:", {
+      originalLocationAddress: location.address,
+      addressInput: addressInput,
+      finalAddress: updatedLocation.address,
+    });
+
     // Navigate back with location data as parameters
     router.push({
       pathname: "/createTask",

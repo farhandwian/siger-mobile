@@ -30,6 +30,7 @@ interface Props {
   initialRegion?: Region;
   showMyLocationButton?: boolean;
   height?: number;
+  showLocationInfo?: boolean;
 }
 
 interface SearchResult {
@@ -53,6 +54,7 @@ export default function MapLocationPicker({
   },
   showMyLocationButton = true,
   height = 300,
+  showLocationInfo = true,
 }: Props) {
   const mapRef = useRef<MapView>(null);
   const [loading, setLoading] = useState(false);
@@ -387,7 +389,7 @@ export default function MapLocationPicker({
       {errorText && <Text style={styles.errorText}>{errorText}</Text>}
 
       {/* Selected Location Info */}
-      {value && (
+      {value && showLocationInfo && (
         <View style={styles.locationInfo}>
           <Text style={styles.locationTitle}>Lokasi Dipilih:</Text>
           <Text style={styles.coordinatesText}>
